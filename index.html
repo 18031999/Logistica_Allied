@@ -379,15 +379,22 @@
     }
 
     async function carregarPerfilUsuario() {
-  const { data } = await supabaseClient.from('profiles').select('role').eq('id', usuarioAtual.id).single();
-  if (data && data.role) {
-    // Força para maiúsculas e garante que se for ADM, assume o perfil administrativo
-    perfilUsuario = String(data.role).trim().toUpperCase();
-  }
-  
-  // Força opcional caso queira garantir que o seu e-mail específico seja sempre ADM no frontend:
-  if (usuarioAtual.email === 'm.silva@ctdi.com') {
+  // Define o seu e-mail como Administrador principal diretamente pela sessão
+  if (usuarioAtual && usuarioAtual.email === 'm.silva@ctdi.com') {
     perfilUsuario = 'ADM';
+    return;
+  }
+
+  try {
+    // Tenta buscar o perfil na tabela de forma segura
+    const { data, error } = await supabaseClient.from('profiles').select('role').eq('id', usuarioAtual.id).maybeSingle();
+    if (data && data.role) {
+      perfilUsuario = String(data.role).trim().toUpperCase();
+    } else {
+      perfilUsuario = 'CONFERENCIA';
+    }
+  } catch (err) {
+    perfilUsuario = 'CONFERENCIA';
   }
 }
 

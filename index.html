@@ -3,984 +3,583 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Controle Logístico</title>
+  <title>Sistema de Gestão e Logística de Dispositivos</title>
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- SheetJS CDN (para parsing e exportação de planilhas) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-gray-100 font-sans text-gray-800">
+<body class="bg-gray-100 font-sans text-gray-800 antialiased min-h-screen">
 
-  <!-- TELA DE LOGIN -->
-  <div id="login-screen" class="min-h-screen flex items-center justify-center bg-gray-200">
-    <div class="bg-white p-8 rounded-lg shadow-md w-96">
-      <h2 class="text-2xl font-bold mb-6 text-center text-blue-600">Acesso ao Sistema</h2>
-      
-      <div id="form-login">
-        <input type="email" id="login-email" placeholder="Email" class="w-full border p-2 mb-4 rounded text-sm">
-        <input type="password" id="login-password" placeholder="Senha" class="w-full border p-2 mb-2 rounded text-sm">
-        
-        <div class="text-right mb-4">
-          <button onclick="exibirEsqueciSenha()" class="text-xs text-blue-600 hover:underline">Esqueci minha senha</button>
-        </div>
-
-        <button onclick="fazerLogin()" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 font-bold text-sm">Entrar</button>
+  <!-- CABEÇALHO -->
+  <header class="bg-blue-900 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center space-x-3">
+        <i class="fa-solid fa-boxes-packing text-2xl text-yellow-400"></i>
+        <h1 class="text-xl font-bold tracking-wide">Gestão & Logística de Dispositivos</h1>
       </div>
-
-      <!-- FORMULÁRIO ESQUECI MINHA SENHA -->
-      <div id="form-esqueci-senha" class="hidden">
-        <p class="text-xs text-gray-600 mb-4">Digite o seu e-mail para receber o link de redefinição de senha.</p>
-        <input type="email" id="reset-email" placeholder="Seu email cadastrado" class="w-full border p-2 mb-4 rounded text-sm">
-        
-        <button onclick="enviarRedefinicaoSenha()" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 font-bold text-sm mb-2">Enviar E-mail de Recuperação</button>
-        <button onclick="exibirLogin()" class="w-full bg-gray-300 text-gray-700 py-1.5 rounded hover:bg-gray-400 font-semibold text-xs">Voltar ao Login</button>
-      </div>
-
-      <p id="login-error" class="text-red-500 text-xs mt-3 hidden text-center"></p>
-      <p id="login-success" class="text-green-600 text-xs mt-3 hidden text-center"></p>
-    </div>
-  </div>
-
-  <!-- APLICAÇÃO PRINCIPAL -->
-  <div id="app-screen" class="hidden min-h-screen flex flex-col">
-    <header class="bg-blue-800 text-white p-4 flex justify-between items-center shadow flex-wrap gap-4">
-      <div class="flex items-center gap-3">
-        <div>
-          <h1 class="text-xl font-bold">Gestão Logística - Remessas</h1>
-          <p id="user-info" class="text-xs text-blue-200"></p>
-        </div>
-        <button id="btn-adm-config" onclick="abrirModalConvite()" class="hidden bg-blue-700 hover:bg-blue-600 p-2 rounded-full text-lg shadow" title="Gerenciar Utilizadores" aria-label="Gerenciar Utilizadores">
-          ⚙️
-        </button>
-      </div>
-
-      <!-- SELETOR GLOBAL DE DATA DE TRANSPORTE -->
-      <div class="flex items-center space-x-2 bg-blue-900 px-3 py-1.5 rounded border border-blue-700">
-        <label for="filtro-data-global" class="text-xs font-bold text-blue-200">Data de Entrega / Transporte:</label>
-        <select id="filtro-data-global" onchange="alterarDataGlobal(this.value)" class="bg-white text-gray-800 text-xs font-bold p-1 rounded border">
+      <div class="flex items-center gap-2 bg-blue-800 p-2 rounded-lg border border-blue-700">
+        <label for="select-data-transporte" class="text-xs font-semibold uppercase tracking-wider text-blue-200">
+          Data Ativa de Transporte:
+        </label>
+        <select id="select-data-transporte" onchange="alterarDataTransporteAtiva(this.value)" class="bg-white text-gray-900 text-sm font-bold rounded px-3 py-1 outline-none focus:ring-2 focus:ring-yellow-400">
           <option value="">Carregando datas...</option>
         </select>
+        <button onclick="prompNovaDataTransporte()" title="Nova Data" class="bg-yellow-500 hover:bg-yellow-600 text-blue-950 font-bold px-2.5 py-1 rounded text-sm transition">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navegação por Abas -->
+  <nav class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-4 flex overflow-x-auto">
+      <button onclick="alternarAba('importacao')" id="tab-importacao" class="px-5 py-3 font-semibold text-sm border-b-2 border-blue-600 text-blue-600 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-file-import"></i> 1. Importação & Tratamento
+      </button>
+      <button onclick="alternarAba('logistica')" id="tab-logistica" class="px-5 py-3 font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-blue-600 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-truck-ramp-box"></i> 2. Gestão Logística & Lotes
+      </button>
+      <button onclick="alternarAba('conferencia')" id="tab-conferencia" class="px-5 py-3 font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-blue-600 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-barcode"></i> 3. Conferência de Caixas (Bipagem)
+      </button>
+      <button onclick="alternarAba('notas')" id="tab-notas" class="px-5 py-3 font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-blue-600 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-file-invoice"></i> 4. Anexos & Notas de Retorno
+      </button>
+    </div>
+  </nav>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="max-w-7xl mx-auto px-4 py-6">
+
+    <!-- ABA 1: IMPORTAÇÃO E TRATAMENTO -->
+    <section id="conteudo-importacao" class="space-y-6">
+      <div class="bg-white p-6 rounded-lg shadow border border-gray-200">
+        <h2 class="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+          <i class="fa-solid fa-upload text-blue-600"></i> Importar Planilha de Entrada (.xlsx / .csv)
+        </h2>
+        <p class="text-xs text-gray-500 mb-4">
+          Faça o upload do arquivo para realizar o tratamento automático, formatação de Trade Allied e cruzamento de IMEI.
+        </p>
+
+        <div class="flex flex-col md:flex-row items-center gap-4">
+          <input type="file" id="arquivo-input" accept=".xlsx, .xls, .csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
+          <button onclick="processarArquivoImportacao()" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded shadow text-sm transition whitespace-nowrap">
+            Processar Planilha
+          </button>
+        </div>
       </div>
 
-      <button onclick="fazerLogout()" class="bg-red-500 text-xs px-3 py-1 rounded hover:bg-red-600 font-semibold">Sair</button>
-    </header>
-
-    <nav class="bg-white border-b flex space-x-4 px-6 pt-3">
-      <button onclick="mudarAba('importacao')" id="btn-importacao" class="aba-btn pb-2 border-b-2 border-blue-600 font-semibold text-blue-600">Importação</button>
-      <button onclick="mudarAba('logistica')" id="btn-logistica" class="aba-btn pb-2 border-b-2 border-transparent text-gray-500 hover:text-blue-600">Logística</button>
-      <button onclick="mudarAba('conferencia')" id="btn-conferencia" class="aba-btn pb-2 border-b-2 border-transparent text-gray-500 hover:text-blue-600">Conferência</button>
-      <button onclick="mudarAba('notas')" id="btn-notas" class="aba-btn pb-2 border-b-2 border-transparent text-gray-500 hover:text-blue-600">Notas Retorno</button>
-    </nav>
-
-    <main class="p-6 flex-1 relative">
-      <!-- ABA IMPORTAÇÃO -->
-      <section id="aba-importacao" class="aba-conteudo bg-white p-6 rounded shadow">
-        <h2 class="text-lg font-bold mb-4">Importar Planilha Excel (Perfil ADM)</h2>
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-1">Data de Saída / Transporte:</label>
-          <input type="date" id="data-transporte" class="border p-2 rounded">
-        </div>
-        <div class="mb-4">
-          <input type="file" id="excel-file" accept=".xlsx, .xls" class="border p-2 rounded">
-        </div>
-        <button onclick="processarExcel()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-semibold">Carregar Dados</button>
-        <div id="status-importacao" class="mt-4 text-sm font-semibold"></div>
-      </section>
-
-      <!-- ABA LOGÍSTICA -->
-      <section id="aba-logistica" class="aba-conteudo hidden bg-white p-6 rounded shadow">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-bold">Painel de Controle - Logística</h2>
-          <span class="text-xs text-gray-500">Edição permitida em: Pedido e NF Retorno</span>
+      <!-- Tabela Prévia do Tratamento -->
+      <div id="painel-previa" class="hidden bg-white p-6 rounded-lg shadow border border-gray-200 space-y-4">
+        <div class="flex justify-between items-center border-b pb-3">
+          <h3 class="font-bold text-gray-800">Prévia do Tratamento dos Dados</h3>
+          <span id="badge-total-linhas" class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded">
+            0 registros encontrados
+          </span>
         </div>
 
-        <!-- FILTROS (APLICAM-SE À TABELA E À VISÃO DINÂMICA) -->
-        <div class="bg-gray-100 p-3 rounded mb-4 flex flex-wrap gap-4 items-center">
-          <div>
-            <label class="block text-xs font-bold text-gray-600 mb-1">Filtrar NF Remessa/Entrada:</label>
-            <select id="filtro-nf-entrada" onchange="aplicarFiltrosLogistica()" class="border p-1.5 rounded text-xs bg-white min-w-[180px]">
-              <option value="">Todas as NFs</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-gray-600 mb-1">Filtrar Status Orçamento:</label>
-            <select id="filtro-status" onchange="aplicarFiltrosLogistica()" class="border p-1.5 rounded text-xs bg-white min-w-[180px]">
-              <option value="">Todos os Status</option>
-            </select>
-          </div>
-          <button onclick="limparFiltrosLogistica()" class="mt-4 bg-gray-500 text-white text-xs px-3 py-1.5 rounded hover:bg-gray-600 font-semibold">Limpar Filtros</button>
-        </div>
-
-        <!-- ATRIBUIÇÃO EM LOTE -->
-        <div class="bg-blue-50 border border-blue-200 p-3 rounded mb-4 flex flex-wrap gap-3 items-center">
-          <span class="text-xs font-bold text-blue-800">Atribuir em Lote (<span id="count-selecionados">0</span> selecionados):</span>
-          <input type="text" id="lote-nf-retorno" placeholder="NF Retorno" class="border p-1.5 rounded text-xs w-32">
-          <input type="text" id="lote-pedido" placeholder="Pedido" class="border p-1.5 rounded text-xs w-32">
-          <button onclick="aplicarEmLoteLogistica()" class="bg-blue-600 text-white text-xs px-4 py-1.5 rounded hover:bg-blue-700 font-bold">Aplicar a Todos Selecionados</button>
-        </div>
-
-        <!-- TABELA OPERACIONAL PRINCIPAL -->
-        <div class="overflow-x-auto max-h-[400px] mb-8">
-          <table class="w-full text-xs text-left border">
-            <thead class="bg-gray-100 uppercase border-b sticky top-0 z-10">
+        <div class="overflow-x-auto max-h-96 border rounded">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="bg-gray-100 text-gray-700 uppercase font-semibold sticky top-0 border-b">
               <tr>
-                <th class="p-2 border text-center w-8"><input type="checkbox" id="check-todos" onchange="selecionarTodosLogistica(this)"></th>
-                <th class="p-2 border text-center w-10">#</th>
-                <th class="p-2 border">Trade Allied</th>
-                <th class="p-2 border">NF Remessa</th>
-                <th class="p-2 border">Atendimento</th>
-                <th class="p-2 border">IMEI</th>
-                <th class="p-2 border">SKU</th>
-                <th class="p-2 border">Status Orç.</th>
-                <th class="p-2 border">Caixa</th>
-                <th class="p-2 border bg-yellow-100 w-32">NF Retorno</th>
-                <th class="p-2 border bg-yellow-100 w-32">Pedido</th>
-                <th class="p-2 border text-center">Ações</th>
+                <th class="p-2 border-r">Trade Allied (Tratado)</th>
+                <th class="p-2 border-r">IMEI Allied</th>
+                <th class="p-2 border-r">SKU</th>
+                <th class="p-2 border-r">NF Origem</th>
+                <th class="p-2 border-r">Status</th>
+                <th class="p-2">Caixa</th>
               </tr>
             </thead>
-            <tbody id="tabela-logistica"></tbody>
+            <tbody id="tabela-previa-body"></tbody>
           </table>
         </div>
 
-        <!-- VISÃO DINÂMICA COMPACTA HIERÁRQUICA (NO FIM DA PÁGINA) -->
-        <div class="bg-blue-50/50 border border-blue-200 p-4 rounded-lg shadow-sm">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-blue-900 mb-3 flex items-center gap-2">
-            <span>📊 Visão Dinâmica (Resumo Agrupado por NF e SKUs)</span>
-          </h3>
-          <div class="overflow-x-auto max-h-64 border rounded bg-white shadow-inner">
-            <table class="w-full text-xs text-left border-collapse">
-              <thead>
-                <tr class="bg-blue-100 text-blue-900 uppercase text-[11px] font-bold border-b border-blue-200 sticky top-0">
-                  <th class="p-2 border-r border-blue-200">Rótulos de Linha (NF / SKU)</th>
-                  <th class="p-2 border-r border-blue-200 text-center w-28">Quantidade</th>
-                  <th class="p-2 border-r border-blue-200 text-center w-32">Status</th>
-                  <th class="p-2 text-center w-24">CAIXA</th>
+        <div class="flex justify-end gap-3 pt-2">
+          <button onclick="cancelarImportacao()" class="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded">
+            Cancelar
+          </button>
+          <button onclick="salvarImportacaoNoSupabase()" class="px-6 py-2 text-sm font-bold bg-green-600 hover:bg-green-700 text-white rounded shadow">
+            Confirmar e Enviar para o Banco
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 2: GESTÃO LOGÍSTICA & LOTES -->
+    <section id="conteudo-logistica" class="hidden space-y-6">
+      
+      <!-- Resumo Dinâmico em Árvore (NF -> SKU) -->
+      <div class="bg-white p-6 rounded-lg shadow border border-gray-200 space-y-3">
+        <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-sitemap text-blue-600"></i> Resumo Hierárquico das NFs de Origem
+        </h2>
+        <div class="overflow-x-auto border rounded max-h-64">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-blue-50 text-blue-900 uppercase font-semibold border-b">
+              <tr>
+                <th class="p-2 border-r border-blue-200">NF / SKU</th>
+                <th class="p-2 border-r border-blue-200 text-center">Quantidade Total</th>
+                <th class="p-2 border-r border-blue-200 text-center">Status Domínio</th>
+                <th class="p-2 text-center">Caixa Atribuída</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-resumo-dinamico"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Ações em Lote e Filtros -->
+      <div class="bg-white p-6 rounded-lg shadow border border-gray-200 space-y-4">
+        <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-list-check text-blue-600"></i> Atribuição em Lote (NF Retorno / Pedido)
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">NF Retorno</label>
+            <input type="text" id="lote-nf-retorno" placeholder="Digite a NF Retorno..." class="w-full border rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Número do Pedido</label>
+            <input type="text" id="lote-pedido" placeholder="Digite o Pedido..." class="w-full border rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div class="flex items-end">
+            <button onclick="aplicarEmLoteLogistica()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded text-sm shadow transition">
+              Atribuir aos Selecionados (<span id="count-selecionados">0</span>)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela Principal de Logística -->
+      <div class="bg-white p-6 rounded-lg shadow border border-gray-200 space-y-4">
+        <div class="flex justify-between items-center">
+          <h2 class="text-base font-bold text-gray-800">Registros de Logística</h2>
+          <button onclick="carregarDadosLogistica()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-3 py-1.5 rounded border">
+            <i class="fa-solid fa-rotate-right"></i> Atualizar Tabela
+          </button>
+        </div>
+
+        <div class="overflow-x-auto border rounded max-h-[500px]">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="bg-gray-100 text-gray-700 uppercase font-semibold sticky top-0 border-b">
+              <tr>
+                <th class="p-2 border-r text-center">
+                  <input type="checkbox" onchange="selecionarTodosLogistica(this)" class="rounded">
+                </th>
+                <th class="p-2 border-r">Trade Allied</th>
+                <th class="p-2 border-r">IMEI</th>
+                <th class="p-2 border-r">SKU</th>
+                <th class="p-2 border-r">NF Origem</th>
+                <th class="p-2 border-r">NF Retorno</th>
+                <th class="p-2 border-r">Pedido</th>
+                <th class="p-2 border-r">Caixa</th>
+                <th class="p-2 border-r text-center">Status</th>
+                <th class="p-2 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-logistica-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 3: CONFERÊNCIA DE CAIXAS (BIPAGEM) -->
+    <section id="conteudo-conferencia" class="hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <!-- Painel de Bipagem -->
+        <div class="md:col-span-2 bg-white p-6 rounded-lg shadow border border-gray-200 space-y-4">
+          <div class="flex justify-between items-center">
+            <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+              <i class="fa-solid fa-barcode text-purple-600"></i> Leitor de Código de Barras / Bipagem
+            </h2>
+            <button onclick="toggleGavetaCaixas()" class="text-xs bg-purple-100 text-purple-800 hover:bg-purple-200 font-bold px-3 py-1.5 rounded">
+              <i class="fa-solid fa-box-archive"></i> Ver Status de Todas Caixas
+            </button>
+          </div>
+
+          <div class="flex items-center gap-3 bg-purple-50 p-4 rounded-lg border border-purple-200">
+            <span id="badge-caixa-status" class="px-4 py-2 rounded text-white font-bold text-sm bg-gray-500">
+              NENHUMA CAIXA SELECIONADA
+            </span>
+            <button onclick="trocarCaixa()" class="bg-purple-700 hover:bg-purple-800 text-white font-bold px-4 py-2 rounded text-sm shadow">
+              Definir / Trocar Caixa Ativa
+            </button>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1 uppercase">Bipar / Digitar Trade Allied (Pressione ENTER 2 vezes para confirmar):</label>
+            <input type="text" id="input-bipagem" placeholder="Aguardando bipagem..." class="w-full text-lg border-2 border-purple-400 rounded-lg p-3 outline-none focus:ring-4 focus:ring-purple-200 font-mono tracking-wider">
+          </div>
+
+          <div id="alerta-erro-caixa" class="hidden p-3 bg-red-100 border border-red-300 text-red-800 rounded text-xs font-bold"></div>
+
+          <!-- Tabela de Conferência da Caixa Atual -->
+          <div class="border rounded overflow-x-auto max-h-80">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-gray-100 text-gray-700 uppercase border-b sticky top-0">
+                <tr>
+                  <th class="p-2 border">Trade Allied</th>
+                  <th class="p-2 border">IMEI</th>
+                  <th class="p-2 border">SKU</th>
+                  <th class="p-2 border">Caixa Prevista</th>
+                  <th class="p-2 border">Status Conferência</th>
                 </tr>
               </thead>
-              <tbody id="tabela-dinamica-resumo" class="divide-y divide-gray-200 font-mono"></tbody>
+              <tbody id="tabela-conferencia"></tbody>
             </table>
           </div>
         </div>
-      </section>
 
-      <!-- ABA CONFERÊNCIA -->
-      <section id="aba-conferencia" class="aba-conteudo hidden bg-white p-6 rounded shadow relative">
-        <div class="flex justify-between items-center mb-6">
-          <div class="flex items-center space-x-4">
-            <h2 class="text-lg font-bold">Conferência de Caixas</h2>
-            <button onclick="trocarCaixa()" class="bg-purple-600 text-white text-xs px-3 py-1.5 rounded hover:bg-purple-700 font-bold">MUDAR CAIXA</button>
-            <button onclick="toggleGavetaCaixas()" class="bg-slate-700 text-white text-xs px-3 py-1.5 rounded hover:bg-slate-800 font-bold flex items-center gap-1">
-              <span>📦 Ver Todas as Caixas</span>
-            </button>
-          </div>
-          <div id="badge-caixa-status" class="px-4 py-2 rounded text-white font-bold text-sm bg-gray-400">
-            NENHUMA CAIXA SELECIONADA
-          </div>
+        <!-- Lateral: Gaveta / Painel das Caixas -->
+        <div id="gaveta-caixas" class="bg-white p-6 rounded-lg shadow border border-gray-200 space-y-4">
+          <h3 class="font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
+            <i class="fa-solid fa-boxes-stacked text-purple-600"></i> Progresso das Caixas
+          </h3>
+          <div id="lista-todas-caixas" class="space-y-2 max-h-[450px] overflow-y-auto pr-1"></div>
         </div>
 
-        <div class="bg-gray-50 p-4 border rounded mb-6">
-          <label class="block text-sm font-medium mb-1">Bipar Código (Trade Allied):</label>
-          <input type="text" id="input-bipagem" placeholder="Aguardando bipagem do leitor..." class="w-full border-2 border-blue-500 p-3 rounded text-lg font-mono focus:outline-none" autofocus>
-          <p class="text-xs text-gray-500 mt-1">Pressione [ENTER] 2x para confirmar a leitura de forma definitiva.</p>
-        </div>
-
-        <div id="alerta-erro-caixa" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded font-bold"></div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm text-left border">
-            <thead class="bg-gray-100 uppercase border-b">
-              <tr>
-                <th class="p-2 border">Trade Allied</th>
-                <th class="p-2 border">IMEI</th>
-                <th class="p-2 border">SKU</th>
-                <th class="p-2 border">Caixa Prevista</th>
-                <th class="p-2 border">Status Conferência</th>
-              </tr>
-            </thead>
-            <tbody id="tabela-conferencia"></tbody>
-          </table>
-        </div>
-
-        <aside id="gaveta-caixas" class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl border-l z-50 transform translate-x-full transition-transform duration-300 ease-in-out p-4 flex flex-col">
-          <div class="flex justify-between items-center border-b pb-3 mb-4">
-            <h3 class="font-bold text-gray-700 flex items-center gap-2">📦 Status das Caixas</h3>
-            <button onclick="toggleGavetaCaixas()" class="text-gray-500 hover:text-red-600 font-bold text-xl">&times;</button>
-          </div>
-          <div id="lista-todas-caixas" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
-        </aside>
-      </section>
-
-      <!-- ABA NOTAS RETORNO (ENVIO DE ARQUIVOS E EXTRAÇÃO/DOWNLOAD) -->
-      <section id="aba-notas" class="aba-conteudo hidden bg-white p-6 rounded shadow">
-        <h2 class="text-lg font-bold mb-2">Anexo e Download de Arquivos (XML / PDF)</h2>
-        <p class="text-xs text-gray-500 mb-6">A Logística realiza o upload dos arquivos e qualquer usuário pode baixá-los diretamente.</p>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <!-- CARD UPLOAD XML -->
-          <div class="border-2 border-dashed border-emerald-300 bg-emerald-50/50 rounded-xl p-6 text-center hover:bg-emerald-50 transition-colors flex flex-col items-center justify-center">
-            <div class="text-4xl mb-3">📄</div>
-            <h3 class="text-sm font-bold text-emerald-900 mb-1">Upload de Arquivo XML</h3>
-            <p class="text-xs text-emerald-700 mb-4 max-w-xs">Anexe o arquivo XML referente às notas de retorno da data ativa.</p>
-            
-            <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-lg shadow inline-flex items-center gap-2 transition-transform active:scale-95">
-              <span>Selecionar & Enviar XML</span>
-              <input type="file" id="btn-upload-xml" accept=".xml" onchange="uploadArquivoEspecial(event, 'xml')" class="hidden">
-            </label>
-            <span id="status-upload-xml" class="text-xs font-semibold mt-3 text-emerald-800"></span>
-          </div>
-
-          <!-- CARD UPLOAD PDF -->
-          <div class="border-2 border-dashed border-red-300 bg-red-50/50 rounded-xl p-6 text-center hover:bg-red-50 transition-colors flex flex-col items-center justify-center">
-            <div class="text-4xl mb-3">📑</div>
-            <h3 class="text-sm font-bold text-red-900 mb-1">Upload de DANFE em PDF</h3>
-            <p class="text-xs text-red-700 mb-4 max-w-xs">Anexe o documento DANFE em formato PDF correspondente.</p>
-
-            <label class="cursor-pointer bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-5 py-2.5 rounded-lg shadow inline-flex items-center gap-2 transition-transform active:scale-95">
-              <span>Selecionar & Enviar PDF</span>
-              <input type="file" id="btn-upload-pdf" accept=".pdf" onchange="uploadArquivoEspecial(event, 'pdf')" class="hidden">
-            </label>
-            <span id="status-upload-pdf" class="text-xs font-semibold mt-3 text-red-800"></span>
-          </div>
-        </div>
-
-        <!-- SEÇÃO DE EXTRAÇÃO DE ARQUIVOS -->
-        <div class="border-t pt-6 bg-slate-50 p-4 rounded-lg border">
-          <h3 class="text-sm font-bold text-gray-800 mb-1">📥 Baixar Arquivos Anexados no Computador</h3>
-          <p class="text-xs text-gray-500 mb-4">Extraia e faça o download dos arquivos (XML e PDF) vinculados à data de entrega selecionada.</p>
-
-          <div class="flex flex-wrap gap-3">
-            <button onclick="baixarArquivosAnexados('xml')" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2.5 rounded shadow inline-flex items-center gap-2">
-              <span>📄 Baixar XMLs Anexados</span>
-            </button>
-            <button onclick="baixarArquivosAnexados('pdf')" class="bg-red-700 hover:bg-red-800 text-white text-xs font-bold px-4 py-2.5 rounded shadow inline-flex items-center gap-2">
-              <span>📑 Baixar PDFs Anexados</span>
-            </button>
-          </div>
-          <p id="status-download-anexos" class="text-xs font-semibold mt-3 text-gray-700"></p>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <!-- MODAL CONVITE DE USUÁRIOS -->
-  <div id="modal-convite" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white p-6 rounded-lg shadow-xl w-96">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-bold text-blue-800">Convidar Novo Utilizador</h3>
-        <button onclick="fecharModalConvite()" class="text-gray-500 hover:text-red-600 font-bold">&times;</button>
       </div>
+    </section>
 
-      <label class="block text-xs font-bold mb-1">E-mail do Novo Utilizador:</label>
-      <input type="email" id="convite-email" placeholder="usuario@empresa.com" class="w-full border p-2 mb-3 rounded text-xs">
+    <!-- ABA 4: ANEXOS & NOTAS DE RETORNO -->
+    <section id="conteudo-notas" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-lg shadow border border-gray-200 space-y-6">
+        <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-folder-open text-blue-600"></i> Anexar e Baixar Documentos de Retorno
+        </h2>
 
-      <label class="block text-xs font-bold mb-1">Perfil de Acesso:</label>
-      <select id="convite-role" class="w-full border p-2 mb-4 rounded text-xs">
-        <option value="CONFERENCIA">Conferência</option>
-        <option value="LOGISTICA">Logística</option>
-        <option value="ADM">Administrador</option>
-      </select>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Bloco Upload PDF/XML -->
+          <div class="p-4 border rounded-lg bg-gray-50 space-y-3">
+            <h3 class="font-bold text-sm text-gray-700"><i class="fa-solid fa-file-pdf text-red-500"></i> Upload de Arquivos DANFE / XML</h3>
+            <p class="text-xs text-gray-500">Envie as NFs de retorno vinculadas à data de transporte ativa.</p>
+            
+            <div class="space-y-2">
+              <label class="block text-xs font-semibold">Anexar DANFE (PDF):</label>
+              <input type="file" accept=".pdf" onchange="uploadArquivoEspecial(event, 'pdf')" class="text-xs text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:bg-red-100 file:text-red-700">
+              <div id="status-upload-pdf" class="text-[10px] text-gray-500 font-semibold"></div>
+            </div>
 
-      <button onclick="enviarConvite()" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 font-bold text-xs">Enviar Convite por E-mail</button>
-      <p id="convite-status" class="text-xs mt-3 font-semibold text-center hidden"></p>
-    </div>
-  </div>
+            <div class="space-y-2 pt-2 border-t">
+              <label class="block text-xs font-semibold">Anexar XML de Retorno:</label>
+              <input type="file" accept=".xml" onchange="uploadArquivoEspecial(event, 'xml')" class="text-xs text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-100 file:text-blue-700">
+              <div id="status-upload-xml" class="text-[10px] text-gray-500 font-semibold"></div>
+            </div>
+          </div>
 
+          <!-- Bloco Downloads -->
+          <div class="p-4 border rounded-lg bg-gray-50 space-y-3 flex flex-col justify-between">
+            <div>
+              <h3 class="font-bold text-sm text-gray-700"><i class="fa-solid fa-cloud-arrow-down text-green-600"></i> Baixar Arquivos Anexados</h3>
+              <p class="text-xs text-gray-500 mb-4">Faça o download dos arquivos vinculados à data selecionada no cabeçalho.</p>
+              
+              <div class="space-y-2">
+                <button onclick="baixarArquivosAnexados('pdf')" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded text-xs shadow flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-file-pdf"></i> Baixar NFs de Retorno (PDF)
+                </button>
+                <button onclick="baixarArquivosAnexados('xml')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-xs shadow flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-file-code"></i> Baixar XMLs de Retorno
+                </button>
+              </div>
+            </div>
+
+            <div id="status-download-anexos" class="text-xs font-semibold text-gray-600"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- LÓGICA JAVASCRIPT PRINCIPAL -->
   <script>
-    const SUPABASE_URL = "https://bdwqzafxhsrcoodazfpw.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_TkmJ48a-zEA5KbpGNaNe-g_jtbcY0Br"; 
+    // CONFIGURAÇÃO SUPABASE
+    const SUPABASE_URL = "https://SEU-PROJETO.supabase.co"; // Substitua com a sua URL do Supabase
+    const SUPABASE_KEY = "SUA-CHAVE-ANONIMA"; // Substitua com a sua Anon Key do Supabase
     
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let supabaseClient = null;
+    if (SUPABASE_URL.indexOf("SEU-PROJETO") === -1) {
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    } else {
+      console.warn("Supabase não configurado. Insira a URL e a KEY no script.");
+    }
 
-    let usuarioAtual = null;
-    let perfilUsuario = 'CONFERENCIA';
-    let caixaAtualConferencia = null;
+    // VARIÁVEIS GLOBAIS DE ESTADO
+    let dataTransporteSelecionada = '';
+    let dadosImportacaoTratados = [];
+    let caixaAtualConferencia = '';
     let teclaEnterCount = 0;
     let tradeAguardandoConfirmacao = null;
 
-    let dataTransporteSelecionada = null;
-    let abaAtual = 'importacao';
-
-    let todosDadosLogistica = [];
-    let dadosFiltradosLogistica = [];
-
-    document.addEventListener("DOMContentLoaded", async () => {
-      const { data } = await supabaseClient.auth.getSession();
-      if (data && data.session) {
-        usuarioAtual = data.session.user;
-        await carregarPerfilUsuario();
-        const abaSalva = localStorage.getItem('aba_ativa');
-        if (abaSalva) abaAtual = abaSalva;
-        iniciarAplicacao();
-      }
+    // INICIALIZAÇÃO DA PÁGINA
+    document.addEventListener('DOMContentLoaded', async () => {
+      await carregarListaDatasTransporte();
     });
 
-    async function fazerLogin() {
-      ocultarMensagensLogin();
-      const email = document.getElementById('login-email').value;
-      const password = document.getElementById('login-password').value;
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
-      if (error) {
-        exibirErroLogin("Erro: " + error.message);
-        return;
-      }
-
-      usuarioAtual = data.user;
-      await carregarPerfilUsuario();
-      iniciarAplicacao();
-    }
-
-    function exibirEsqueciSenha() {
-      ocultarMensagensLogin();
-      document.getElementById('form-login').classList.add('hidden');
-      document.getElementById('form-esqueci-senha').classList.remove('hidden');
-    }
-
-    function exibirLogin() {
-      ocultarMensagensLogin();
-      document.getElementById('form-esqueci-senha').classList.add('hidden');
-      document.getElementById('form-login').classList.remove('hidden');
-    }
-
-    async function enviarRedefinicaoSenha() {
-      ocultarMensagensLogin();
-      const email = document.getElementById('reset-email').value.trim();
-
-      if (!email) {
-        exibirErroLogin("Informe o seu e-mail.");
-        return;
-      }
-
-      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin
+    // NAVEGAÇÃO DE ABAS
+    function alternarAba(aba) {
+      const abas = ['importacao', 'logistica', 'conferencia', 'notas'];
+      abas.forEach(a => {
+        document.getElementById(`conteudo-${a}`).classList.add('hidden');
+        const btn = document.getElementById(`tab-${a}`);
+        btn.classList.remove('border-blue-600', 'text-blue-600');
+        btn.classList.add('border-transparent', 'text-gray-500');
       });
 
-      if (error) {
-        exibirErroLogin("Erro ao enviar: " + error.message);
-      } else {
-        exibirSucessoLogin("E-mail de redefinição enviado! Verifique a sua caixa de entrada.");
-      }
-    }
+      document.getElementById(`conteudo-${aba}`).classList.remove('hidden');
+      const btnAtivo = document.getElementById(`tab-${aba}`);
+      btnAtivo.classList.add('border-blue-600', 'text-blue-600');
+      btnAtivo.classList.remove('border-transparent', 'text-gray-500');
 
-    function ocultarMensagensLogin() {
-      document.getElementById('login-error').classList.add('hidden');
-      document.getElementById('login-success').classList.add('hidden');
-    }
-
-    function exibirErroLogin(msg) {
-      const err = document.getElementById('login-error');
-      err.innerText = msg;
-      err.classList.remove('hidden');
-    }
-
-    function exibirSucessoLogin(msg) {
-      const suc = document.getElementById('login-success');
-      suc.innerText = msg;
-      suc.classList.remove('hidden');
-    }
-
-    async function carregarPerfilUsuario() {
-      const { data } = await supabaseClient.from('profiles').select('role').eq('id', usuarioAtual.id).single();
-      if (data) perfilUsuario = data.role;
-    }
-
-    async function iniciarAplicacao() {
-      document.getElementById('login-screen').classList.add('hidden');
-      document.getElementById('app-screen').classList.remove('hidden');
-      document.getElementById('user-info').innerText = `${usuarioAtual.email} (${perfilUsuario})`;
-
-      if (perfilUsuario === 'ADM') {
-        document.getElementById('btn-adm-config').classList.remove('hidden');
-      }
-
-      await carregarDatasTransporteDisponiveis();
-      mudarAba(abaAtual);
-    }
-
-    function abrirModalConvite() {
-      document.getElementById('modal-convite').classList.remove('hidden');
-    }
-
-    function fecharModalConvite() {
-      document.getElementById('modal-convite').classList.add('hidden');
-      document.getElementById('convite-status').classList.add('hidden');
-    }
-
-    async function enviarConvite() {
-      const email = document.getElementById('convite-email').value.trim();
-      const role = document.getElementById('convite-role').value;
-      const status = document.getElementById('convite-status');
-
-      if (!email) {
-        alert("Digite um e-mail válido.");
-        return;
-      }
-
-      status.innerText = "A enviar convite...";
-      status.className = "text-xs mt-3 font-semibold text-center text-blue-600 block";
-
-      const { data, error } = await supabaseClient.auth.signInWithOtp({
-        email: email,
-        options: { data: { role: role } }
-      });
-
-      if (error) {
-        status.innerText = "Erro ao enviar convite: " + error.message;
-        status.className = "text-xs mt-3 font-semibold text-center text-red-600 block";
-      } else {
-        status.innerText = "Convite enviado com sucesso para o e-mail!";
-        status.className = "text-xs mt-3 font-semibold text-center text-green-600 block";
-        document.getElementById('convite-email').value = '';
-      }
-    }
-
-    function fazerLogout() {
-      localStorage.removeItem('aba_ativa');
-      supabaseClient.auth.signOut();
-      window.location.reload();
-    }
-
-    async function carregarDatasTransporteDisponiveis() {
-      const { data } = await supabaseClient.from('dispositivos').select('data_transporte');
-      const selectGlobal = document.getElementById('filtro-data-global');
-
-      if (!data || data.length === 0) {
-        selectGlobal.innerHTML = '<option value="">Sem entregas registradas</option>';
-        return;
-      }
-
-      const datasUnicas = [...new Set(data.map(i => i.data_transporte).filter(Boolean))].sort().reverse();
-
-      selectGlobal.innerHTML = '';
-      datasUnicas.forEach(dt => {
-        selectGlobal.innerHTML += `<option value="${dt}">${dt}</option>`;
-      });
-
-      const dataSalva = localStorage.getItem('data_transporte_ativa');
-      if (dataSalva && datasUnicas.includes(dataSalva)) {
-        dataTransporteSelecionada = dataSalva;
-      } else {
-        dataTransporteSelecionada = datasUnicas[0];
-      }
-
-      selectGlobal.value = dataTransporteSelecionada;
-    }
-
-    function alterarDataGlobal(novaData) {
-      dataTransporteSelecionada = novaData;
-      localStorage.setItem('data_transporte_ativa', novaData);
-      mudarAba(abaAtual);
-    }
-
-    function mudarAba(nomeAba) {
-      abaAtual = nomeAba;
-      localStorage.setItem('aba_ativa', nomeAba);
-
-      document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.add('hidden'));
-      document.querySelectorAll('.aba-btn').forEach(el => {
-        el.classList.remove('border-blue-600', 'text-blue-600');
-        el.classList.add('border-transparent', 'text-gray-500');
-      });
-
-      document.getElementById(`aba-${nomeAba}`).classList.remove('hidden');
-      const btn = document.getElementById(`btn-${nomeAba}`);
-      if (btn) {
-        btn.classList.add('border-blue-600', 'text-blue-600');
-        btn.classList.remove('border-transparent', 'text-gray-500');
-      }
-
-      if (nomeAba === 'logistica') carregarDadosLogistica();
-      if (nomeAba === 'conferencia') {
-        document.getElementById('input-bipagem').focus();
+      if (aba === 'logistica') carregarDadosLogistica();
+      if (aba === 'conferencia') {
+        carregarConferenciaCaixa();
         carregarStatusTodasCaixas();
       }
     }
 
-    async function processarExcel() {
-      if (perfilUsuario !== 'ADM') {
-        alert("Apenas o perfil ADM pode carregar planilhas.");
+    // GESTÃO DE DATAS DE TRANSPORTE
+    async function carregarListaDatasTransporte() {
+      const select = document.getElementById('select-data-transporte');
+      select.innerHTML = '<option value="">Selecione...</option>';
+
+      if (!supabaseClient) return;
+
+      const { data, error } = await supabaseClient
+        .from('dispositivos')
+        .select('data_transporte')
+        .not('data_transporte', 'is', null);
+
+      if (error) {
+        console.error("Erro ao buscar datas:", error);
         return;
       }
 
-      const fileInput = document.getElementById('excel-file');
-      const dataSaida = document.getElementById('data-transporte').value;
+      const datasUnicas = [...new Set(data.map(item => item.data_transporte))].sort().reverse();
 
-      if (!fileInput.files.length || !dataSaida) {
-        alert("Por favor, selecione um arquivo e informe a Data de Saída.");
+      datasUnicas.forEach(dt => {
+        const option = document.createElement('option');
+        option.value = dt;
+        option.innerText = dt;
+        select.appendChild(option);
+      });
+
+      if (datasUnicas.length > 0) {
+        select.value = datasUnicas[0];
+        dataTransporteSelecionada = datasUnicas[0];
+      }
+    }
+
+    function alterarDataTransporteAtiva(data) {
+      dataTransporteSelecionada = data;
+      const abaAtiva = ['importacao', 'logistica', 'conferencia', 'notas'].find(a => !document.getElementById(`conteudo-${a}`).classList.contains('hidden'));
+      if (abaAtiva) alternarAba(abaAtiva);
+    }
+
+    async function prompNovaDataTransporte() {
+      const novaData = prompt("Digite a nova Data de Transporte (Ex: 2026-03-31 ou 31/03/2026):");
+      if (novaData && novaData.trim() !== '') {
+        dataTransporteSelecionada = novaData.trim();
+        const select = document.getElementById('select-data-transporte');
+        const opt = document.createElement('option');
+        opt.value = dataTransporteSelecionada;
+        opt.innerText = dataTransporteSelecionada;
+        opt.selected = true;
+        select.appendChild(opt);
+        alert(`Data Ativa definida como: ${dataTransporteSelecionada}`);
+      }
+    }
+
+    // ABA IMPORTAÇÃO & TRATAMENTO
+    function processarArquivoImportacao() {
+      const fileInput = document.getElementById('arquivo-input');
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert("Por favor, selecione um arquivo de planilha (.xlsx ou .csv).");
         return;
       }
 
       const reader = new FileReader();
-      reader.onload = async (e) => {
+      reader.onload = function (e) {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet);
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
-        const dadosParaInserir = rows.map(r => ({
-          trade_allied: String(r['Trade Allied'] || r['TRADE ALLIED'] || ''),
-          nf_remessa_allied: String(r['NF Remessa Allied'] || r['NF Remessa'] || r['NF REMESSA'] || ''),
-          atendimento: String(r['Atendimento'] || ''),
-          imei_allied: String(r['IMEI Allied'] || ''),
-          sku: String(r['SKU'] || ''),
-          status_orcamento: String(r['STATUS ORÇAMENTO'] || r['Status Orçamento'] || ''),
-          lote: String(r['LOTE'] || ''),
-          nf_peca: String(r['NF PEÇA'] || ''),
-          nf_servico: String(r['NF SERVIÇO'] || ''),
-          caixa: String(r['CAIXA'] || ''),
-          data_transporte: dataSaida
-        })).filter(item => item.trade_allied !== '');
-
-        const { error } = await supabaseClient.from('dispositivos').upsert(dadosParaInserir, { onConflict: 'trade_allied' });
-
-        if (error) {
-          document.getElementById('status-importacao').innerText = "Erro ao carregar dados: " + error.message;
-        } else {
-          document.getElementById('status-importacao').innerText = "Planilha importada com sucesso!";
-          fileInput.value = '';
-          await carregarDatasTransporteDisponiveis();
-          alterarDataGlobal(dataSaida);
-        }
+        tratarDadosPlanilha(json);
       };
-      reader.readAsArrayBuffer(fileInput.files[0]);
+      reader.readAsArrayBuffer(file);
     }
 
-    async function carregarDadosLogistica() {
-      if (!dataTransporteSelecionada) return;
+    function tratarDadosPlanilha(jsonRaw) {
+      dadosImportacaoTratados = [];
 
-      const { data } = await supabaseClient
-        .from('dispositivos')
-        .select('*')
-        .eq('data_transporte', dataTransporteSelecionada)
-        .order('created_at', { ascending: false });
+      jsonRaw.forEach(linha => {
+        let tradeAlliedRaw = String(linha['Trade Allied'] || linha['TRADE ALLIED'] || linha['Trade'] || '').trim();
+        
+        // Tratamento da string do Trade Allied
+        let tradeTratado = tradeAlliedRaw.toUpperCase();
+        tradeTratado = tradeTratado.replace(/^(TRADE|TD|ALLIED)[-\s]*/i, '');
 
-      todosDadosLogistica = data || [];
-      preencherOpcoesFiltros();
-      aplicarFiltrosLogistica();
-    }
+        let imeiAllied = String(linha['IMEI Allied'] || linha['IMEI'] || '').trim();
+        let sku = String(linha['SKU'] || linha['Sku'] || '').trim();
+        let nfOrigem = String(linha['NF Origem'] || linha['NF'] || linha['Nota Fiscal'] || '').trim();
+        let status = String(linha['Status'] || linha['STATUS'] || 'Pendente').trim();
+        let caixa = String(linha['Caixa'] || linha['CAIXA'] || '1').trim();
 
-    function preencherOpcoesFiltros() {
-      const selectNf = document.getElementById('filtro-nf-entrada');
-      const selectStatus = document.getElementById('filtro-status');
-
-      const valNfAtual = selectNf.value;
-      const valStatusAtual = selectStatus.value;
-
-      const nfs = [...new Set(todosDadosLogistica.map(i => i.nf_remessa_allied).filter(Boolean))];
-      const statusList = [...new Set(todosDadosLogistica.map(i => i.status_orcamento).filter(Boolean))];
-
-      selectNf.innerHTML = '<option value="">Todas as NFs</option>';
-      nfs.forEach(nf => { selectNf.innerHTML += `<option value="${nf}">${nf}</option>`; });
-      selectNf.value = valNfAtual;
-
-      selectStatus.innerHTML = '<option value="">Todos os Status</option>';
-      statusList.forEach(st => { selectStatus.innerHTML += `<option value="${st}">${st}</option>`; });
-      selectStatus.value = valStatusAtual;
-    }
-
-    function aplicarFiltrosLogistica() {
-      const nfFiltro = document.getElementById('filtro-nf-entrada').value;
-      const statusFiltro = document.getElementById('filtro-status').value;
-
-      dadosFiltradosLogistica = todosDadosLogistica.filter(item => {
-        const matchNf = !nfFiltro || String(item.nf_remessa_allied) === String(nfFiltro);
-        const matchStatus = !statusFiltro || String(item.status_orcamento) === String(statusFiltro);
-        return matchNf && matchStatus;
+        if (tradeTratado !== '') {
+          dadosImportacaoTratados.push({
+            trade_allied: tradeTratado,
+            imei_allied: imeiAllied,
+            sku: sku,
+            nf_origem: nfOrigem,
+            status: status,
+            caixa: caixa,
+            data_transporte: dataTransporteSelecionada || new Date().toISOString().split('T')[0]
+          });
+        }
       });
 
-      renderizarTabelaLogistica();
-      gerarTabelaDinamicaResumo();
+      renderizarPreviaTratamento();
     }
 
-    function limparFiltrosLogistica() {
-      document.getElementById('filtro-nf-entrada').value = '';
-      document.getElementById('filtro-status').value = '';
-      aplicarFiltrosLogistica();
-    }
-
-    function renderizarTabelaLogistica() {
-      const tbody = document.getElementById('tabela-logistica');
+    function renderizarPreviaTratamento() {
+      const tbody = document.getElementById('tabela-previa-body');
       tbody.innerHTML = '';
-      document.getElementById('check-todos').checked = false;
-      atualizarContadorSelecao();
 
-      dadosFiltradosLogistica.forEach((item, index) => {
-        const podeEditar = (perfilUsuario === 'ADM' || perfilUsuario === 'LOGISTICA');
-        const podeExcluir = (perfilUsuario === 'ADM');
-
+      dadosImportacaoTratados.forEach(item => {
         tbody.innerHTML += `
-          <tr class="border-b hover:bg-gray-50">
-            <td class="p-2 border text-center"><input type="checkbox" class="check-item" value="${item.id}" onchange="atualizarContadorSelecao()"></td>
-            <td class="p-2 border text-center font-bold text-gray-500 bg-gray-50">${index + 1}</td>
-            <td class="p-2 border font-mono">${item.trade_allied || ''}</td>
-            <td class="p-2 border font-semibold">${item.nf_remessa_allied || '-'}</td>
-            <td class="p-2 border">${item.atendimento || ''}</td>
-            <td class="p-2 border">${item.imei_allied || ''}</td>
-            <td class="p-2 border">${item.sku || ''}</td>
-            <td class="p-2 border">${item.status_orcamento || ''}</td>
-            <td class="p-2 border">${item.caixa || ''}</td>
-            <td class="p-2 border bg-yellow-50">
-              <input type="text" value="${item.nf_retorno || ''}" ${!podeEditar ? 'disabled' : ''} 
-                onchange="atualizarCampoLogistica('${item.id}', 'nf_retorno', this.value)" class="w-full border p-1 rounded">
+          <tr class="hover:bg-gray-50 border-b">
+            <td class="p-2 border-r font-mono text-blue-700 font-bold">${item.trade_allied}</td>
+            <td class="p-2 border-r">${item.imei_allied || '-'}</td>
+            <td class="p-2 border-r">${item.sku || '-'}</td>
+            <td class="p-2 border-r">${item.nf_origem || '-'}</td>
+            <td class="p-2 border-r">${item.status}</td>
+            <td class="p-2">${item.caixa}</td>
+          </tr>
+        `;
+      });
+
+      document.getElementById('badge-total-linhas').innerText = `${dadosImportacaoTratados.length} registros encontrados`;
+      document.getElementById('painel-previa').classList.remove('hidden');
+    }
+
+    function cancelarImportacao() {
+      dadosImportacaoTratados = [];
+      document.getElementById('painel-previa').classList.add('hidden');
+      document.getElementById('arquivo-input').value = '';
+    }
+
+    async function salvarImportacaoNoSupabase() {
+      if (!supabaseClient) {
+        alert("Supabase não está configurado!");
+        return;
+      }
+
+      if (dadosImportacaoTratados.length === 0) {
+        alert("Nenhum dado para salvar.");
+        return;
+      }
+
+      const { error } = await supabaseClient
+        .from('dispositivos')
+        .insert(dadosImportacaoTratados);
+
+      if (error) {
+        alert("Erro ao salvar dados no Supabase: " + error.message);
+      } else {
+        alert("Dados importados com sucesso!");
+        cancelarImportacao();
+        carregarListaDatasTransporte();
+      }
+    }
+
+    // ABA GESTÃO LOGÍSTICA & LOTES
+    async function carregarDadosLogistica() {
+      if (!supabaseClient || !dataTransporteSelecionada) return;
+
+      const { data, error } = await supabaseClient
+        .from('dispositivos')
+        .select('*')
+        .eq('data_transporte', dataTransporteSelecionada);
+
+      if (error) {
+        console.error("Erro ao carregar logística:", error);
+        return;
+      }
+
+      renderizarTabelaLogistica(data || []);
+      gerarTabelaDinamicaResumo(data || []);
+    }
+
+    function renderizarTabelaLogistica(registros) {
+      const tbody = document.getElementById('tabela-logistica-body');
+      tbody.innerHTML = '';
+
+      registros.forEach(item => {
+        tbody.innerHTML += `
+          <tr class="hover:bg-gray-50 border-b">
+            <td class="p-2 border-r text-center">
+              <input type="checkbox" value="${item.id}" class="check-item rounded" onchange="atualizarContadorSelecao()">
             </td>
-            <td class="p-2 border bg-yellow-50">
-              <input type="text" value="${item.pedido || ''}" ${!podeEditar ? 'disabled' : ''} 
-                onchange="atualizarCampoLogistica('${item.id}', 'pedido', this.value)" class="w-full border p-1 rounded">
+            <td class="p-2 border-r font-mono font-bold text-gray-800">${item.trade_allied || '-'}</td>
+            <td class="p-2 border-r font-mono">${item.imei_allied || '-'}</td>
+            <td class="p-2 border-r">${item.sku || '-'}</td>
+            <td class="p-2 border-r">${item.nf_origem || '-'}</td>
+            <td class="p-2 border-r">
+              <input type="text" value="${item.nf_retorno \vert{}\vert{} ''}" onchange="atualizarCampoLogistica('${item.id}', 'nf_retorno', this.value)" class="w-full bg-transparent border-b border-dashed border-gray-300 focus:border-blue-500 px-1 outline-none">
             </td>
-            <td class="p-2 border text-center">
-              ${podeExcluir ? `<button onclick="excluirRegistro('${item.id}')" class="text-red-600 font-bold hover:underline">Excluir</button>` : '-'}
+            <td class="p-2 border-r">
+              <input type="text" value="${item.pedido \vert{}\vert{} ''}" onchange="atualizarCampoLogistica('${item.id}', 'pedido', this.value)" class="w-full bg-transparent border-b border-dashed border-gray-300 focus:border-blue-500 px-1 outline-none">
+            </td>
+            <td class="p-2 border-r font-semibold">${item.caixa || '-'}</td>
+            <td class="p-2 border-r text-center">
+              <span class="px-2 py-0.5 text-[10px] rounded font-bold ${item.conferido_caixa ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                ${item.conferido_caixa ? 'CONFERIDO' : 'PENDENTE'}
+              </span>
+            </td>
+            <td class="p-2 text-center">
+              <button onclick="excluirRegistro('${item.id}')" class="text-red-500 hover:text-red-700">
+                <i class="fa-solid fa-trash"></i>
+              </button>
             </td>
           </tr>
         `;
       });
     }
 
-    /* VISÃO DINÂMICA REFILTRADA E POSICIONADA NO FIM DA PÁGINA */
-    function gerarTabelaDinamicaResumo() {
-      const tbody = document.getElementById('tabela-dinamica-resumo');
+    function gerarTabelaDinamicaResumo(registros) {
+      const tbody = document.getElementById('tabela-resumo-dinamico');
       tbody.innerHTML = '';
-
-      if (dadosFiltradosLogistica.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-gray-500 font-sans">Nenhum dado localizado para os filtros aplicados.</td></tr>';
-        return;
-      }
 
       const hierarquia = {};
 
-      dadosFiltradosLogistica.forEach(item => {
-        const nf = item.nf_remessa_allied || 'SEM NF';
-        const sku = item.sku || 'DESCONHECIDO';
-        const status = item.status_orcamento || '-';
-        const caixa = item.caixa || '-';
+      registros.forEach(item => {
+        const nf = item.nf_origem || 'SEM NF ORIGEM';
+        const sku = item.sku || 'SEM SKU';
 
         if (!hierarquia[nf]) {
           hierarquia[nf] = { total: 0, skus: {} };
         }
+
         hierarquia[nf].total++;
 
         if (!hierarquia[nf].skus[sku]) {
-          hierarquia[nf].skus[sku] = { quantidade: 0, status, caixa };
+          hierarquia[nf].skus[sku] = { quantidade: 0, caixa: item.caixa, status: item.status };
         }
+
         hierarquia[nf].skus[sku].quantidade++;
       });
 
       let html = '';
       Object.keys(hierarquia).forEach(nf => {
         html += `
-          <tr class="bg-blue-50 font-bold border-b border-blue-200">
-            <td class="p-2 border-r text-blue-900 flex items-center gap-1">
-              <span>➖</span> <span>${nf}</span>
-            </td>
-            <td class="p-2 border-r text-center text-blue-900">${hierarquia[nf].total}</td>
-            <td class="p-2 border-r text-center text-gray-400">-</td>
-            <td class="p-2 text-center text-gray-400">-</td>
-          </tr>
-        `;
-
-        Object.keys(hierarquia[nf].skus).forEach(sku => {
-          const itemSku = hierarquia[nf].skus[sku];
-          html += `
-            <tr class="hover:bg-gray-50 border-b">
-              <td class="p-1.5 pl-8 border-r text-gray-700">${sku}</td>
-              <td class="p-1.5 border-r text-center font-bold text-gray-800">${itemSku.quantidade}</td>
-              <td class="p-1.5 border-r text-center text-xs text-gray-600">${itemSku.status}</td>
-              <td class="p-1.5 text-center text-xs text-gray-600">${itemSku.caixa}</td>
-            </tr>
-          `;
-        });
-      });
-
-      tbody.innerHTML = html;
-    }
-
-    function selecionarTodosLogistica(master) {
-      document.querySelectorAll('.check-item').forEach(cb => cb.checked = master.checked);
-      atualizarContadorSelecao();
-    }
-
-    function atualizarContadorSelecao() {
-      const qtd = document.querySelectorAll('.check-item:checked').length;
-      document.getElementById('count-selecionados').innerText = qtd;
-    }
-
-    async function aplicarEmLoteLogistica() {
-      const selecionados = Array.from(document.querySelectorAll('.check-item:checked')).map(cb => cb.value);
-
-      if (selecionados.length === 0) {
-        alert("Selecione pelo menos uma linha na tabela para aplicar os dados.");
-        return;
-      }
-
-      const nfRetorno = document.getElementById('lote-nf-retorno').value.trim();
-      const pedido = document.getElementById('lote-pedido').value.trim();
-
-      if (!nfRetorno && !pedido) {
-        alert("Digite ao menos a NF Retorno ou o Pedido para atualizar em lote.");
-        return;
-      }
-
-      const updates = {};
-      if (nfRetorno) updates.nf_retorno = nfRetorno;
-      if (pedido) updates.pedido = pedido;
-
-      const { error } = await supabaseClient.from('dispositivos').update(updates).in('id', selecionados);
-
-      if (error) {
-        alert("Erro ao aplicar alterações em lote: " + error.message);
-      } else {
-        alert(`Atualizado com sucesso para ${selecionados.length} itens!`);
-        document.getElementById('lote-nf-retorno').value = '';
-        document.getElementById('lote-pedido').value = '';
-        carregarDadosLogistica();
-      }
-    }
-
-    async function atualizarCampoLogistica(id, campo, valor) {
-      await supabaseClient.from('dispositivos').update({ [campo]: valor }).eq('id', id);
-    }
-
-    async function excluirRegistro(id) {
-      if (confirm('Deseja excluir este registro?')) {
-        await supabaseClient.from('dispositivos').delete().eq('id', id);
-        carregarDadosLogistica();
-      }
-    }
-
-    // ABA CONFERÊNCIA
-    document.getElementById('input-bipagem').addEventListener('keydown', async (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        teclaEnterCount++;
-
-        const tradeBipado = e.target.value.trim();
-
-        if (teclaEnterCount === 1) {
-          tradeAguardandoConfirmacao = tradeBipado;
-          await validarBipagem(tradeBipado, false);
-        } else if (teclaEnterCount >= 2 && tradeAguardandoConfirmacao) {
-          await validarBipagem(tradeAguardandoConfirmacao, true);
-          document.getElementById('input-bipagem').value = '';
-          teclaEnterCount = 0;
-          tradeAguardandoConfirmacao = null;
-        }
-      }
-    });
-
-    async function validarBipagem(trade, confirmacaoDefinitiva) {
-      const alerta = document.getElementById('alerta-erro-caixa');
-      alerta.classList.add('hidden');
-
-      if (!caixaAtualConferencia) {
-        exibirErroConferencia("Selecione uma caixa antes de iniciar a bipagem.");
-        return;
-      }
-
-      const { data: item, error } = await supabaseClient
-        .from('dispositivos')
-        .select('*')
-        .eq('trade_allied', trade)
-        .eq('data_transporte', dataTransporteSelecionada)
-        .maybeSingle();
-
-      if (error || !item) {
-        exibirErroConferencia(`O código Trade Allied [${trade}] não foi encontrado na entrega do dia ${dataTransporteSelecionada}.`);
-        return;
-      }
-
-      if (String(item.caixa).trim().toLowerCase() !== String(caixaAtualConferencia).trim().toLowerCase()) {
-        exibirErroConferencia(`ALERTA: O item ${trade} pertence à caixa [${item.caixa}], mas a caixa atual selecionada é [${caixaAtualConferencia}]!`);
-        return;
-      }
-
-      if (confirmacaoDefinitiva) {
-        const { error: updateError } = await supabaseClient
-          .from('dispositivos')
-          .update({ conferido: true, data_conferencia: new Date().toISOString() })
-          .eq('id', item.id);
-
-        if (updateError) {
-          exibirErroConferencia("Erro ao atualizar conferência: " + updateError.message);
-        } else {
-          carregarItensCaixaConferencia();
-          carregarStatusTodasCaixas();
-        }
-      } else {
-        destacarItemPendenteVisual(item.id);
-      }
-    }
-
-    function exibirErroConferencia(mensagem) {
-      const alerta = document.getElementById('alerta-erro-caixa');
-      alerta.innerText = mensagem;
-      alerta.classList.remove('hidden');
-    }
-
-    async function trocarCaixa() {
-      const novaCaixa = prompt("Digite o número/nome da Caixa:");
-      if (novaCaixa) {
-        caixaAtualConferencia = novaCaixa.trim();
-        const badge = document.getElementById('badge-caixa-status');
-        badge.innerText = `CAIXA ATUAL: ${caixaAtualConferencia}`;
-        badge.className = "px-4 py-2 rounded text-white font-bold text-sm bg-purple-600 shadow";
-        await carregarItensCaixaConferencia();
-      }
-    }
-
-    async function carregarItensCaixaConferencia() {
-      if (!caixaAtualConferencia || !dataTransporteSelecionada) return;
-
-      const { data } = await supabaseClient
-        .from('dispositivos')
-        .select('*')
-        .eq('data_transporte', dataTransporteSelecionada)
-        .eq('caixa', caixaAtualConferencia);
-
-      const tbody = document.getElementById('tabela-conferencia');
-      tbody.innerHTML = '';
-
-      (data || []).forEach(item => {
-        const statusClass = item.conferido ? 'bg-green-100 text-green-800' : 'bg-amber-50 text-amber-800';
-        const statusTexto = item.conferido ? 'Conferido' : 'Pendente';
-
-        tbody.innerHTML += `
-          <tr id="row-conf-${item.id}" class="border-b">
-            <td class="p-2 border font-mono font-bold">${item.trade_allied}</td>
-            <td class="p-2 border">${item.imei_allied || '-'}</td>
-            <td class="p-2 border">${item.sku || '-'}</td>
-            <td class="p-2 border font-semibold">${item.caixa}</td>
-            <td class="p-2 border font-bold text-center ${statusClass}">${statusTexto}</td>
-          </tr>
-        `;
-      });
-    }
-
-    function destacarItemPendenteVisual(id) {
-      const tr = document.getElementById(`row-conf-${id}`);
-      if (tr) tr.classList.add('bg-yellow-200');
-    }
-
-    function toggleGavetaCaixas() {
-      document.getElementById('gaveta-caixas').classList.toggle('translate-x-full');
-    }
-
-    async function carregarStatusTodasCaixas() {
-      if (!dataTransporteSelecionada) return;
-
-      const { data } = await supabaseClient
-        .from('dispositivos')
-        .select('caixa, conferido')
-        .eq('data_transporte', dataTransporteSelecionada);
-
-      const resumo = {};
-      (data || []).forEach(i => {
-        const cx = i.caixa || 'Sem Caixa';
-        if (!resumo[cx]) resumo[cx] = { total: 0, conferidos: 0 };
-        resumo[cx].total++;
-        if (i.conferido) resumo[cx].conferidos++;
-      });
-
-      const container = document.getElementById('lista-todas-caixas');
-      container.innerHTML = '';
-
-      Object.entries(resumo).forEach(([cx, stat]) => {
-        const concluido = stat.conferidos === stat.total;
-        container.innerHTML += `
-          <div class="p-3 border rounded shadow-sm flex justify-between items-center ${concluido ? 'bg-green-50 border-green-300' : 'bg-gray-50'}">
-            <div>
-              <p class="font-bold text-xs text-gray-800">Caixa: ${cx}</p>
-              <p class="text-[10px] text-gray-500">${stat.conferidos} / ${stat.total} conferidos</p>
-            </div>
-            <span class="text-xs font-bold px-2 py-1 rounded ${concluido ? 'bg-green-600 text-white' : 'bg-amber-500 text-white'}">
-              ${concluido ? 'Ok' : 'Em andamento'}
-            </span>
-          </div>
-        `;
-      });
-    }
-
-    /* UPLOAD E EXTRAÇÃO/DOWNLOAD DOS ARQUIVOS ANEXADOS */
-    async function uploadArquivoEspecial(event, tipo) {
-      if (perfilUsuario !== 'ADM' && perfilUsuario !== 'LOGISTICA') {
-        alert("Apenas os perfis Logística e ADM podem fazer o upload de anexos.");
-        return;
-      }
-
-      const file = event.target.files[0];
-      const statusElement = document.getElementById(`status-upload-${tipo}`);
-
-      if (!file || !dataTransporteSelecionada) {
-        alert("Selecione uma data válida e um arquivo.");
-        return;
-      }
-
-      statusElement.innerText = "A enviar arquivo para o banco...";
-
-      const filePath = `${dataTransporteSelecionada}/${tipo}_${Date.now()}_${file.name}`;
-      
-      const { data: uploadData, error: uploadError } = await supabaseClient
-        .storage
-        .from('anexos_notas')
-        .upload(filePath, file);
-
-      if (uploadError) {
-        statusElement.innerText = "Erro ao subir arquivo: " + uploadError.message;
-        return;
-      }
-
-      const { data: publicUrlData } = supabaseClient
-        .storage
-        .from('anexos_notas')
-        .getPublicUrl(filePath);
-
-      const campoUrl = tipo === 'xml' ? 'url_xml' : 'url_pdf';
-
-      const { error: updateError } = await supabaseClient
-        .from('dispositivos')
-        .update({ [campoUrl]: publicUrlData.publicUrl })
-        .eq('data_transporte', dataTransporteSelecionada);
-
-      if (updateError) {
-        statusElement.innerText = "Erro ao vincular URL aos registros: " + updateError.message;
-      } else {
-        statusElement.innerText = `Arquivo ${file.name} anexado com sucesso! Qualquer usuário já pode baixá-lo.`;
-      }
-    }
-
-    async function baixarArquivosAnexados(tipo) {
-      const statusElement = document.getElementById('status-download-anexos');
-      statusElement.innerText = "Buscando arquivos para download...";
-
-      if (!dataTransporteSelecionada) {
-        alert("Selecione uma data de entrega válida.");
-        return;
-      }
-
-      const campoUrl = tipo === 'xml' ? 'url_xml' : 'url_pdf';
-
-      const { data, error } = await supabaseClient
-        .from('dispositivos')
-        .select(campoUrl)
-        .eq('data_transporte', dataTransporteSelecionada)
-        .not(campoUrl, 'is', null);
-
-      if (error || !data || data.length === 0) {
-        statusElement.innerText = `Nenhum arquivo ${tipo.toUpperCase()} foi anexado para a data ${dataTransporteSelecionada}.`;
-        return;
-      }
-
-      const urlsUnicas = [...new Set(data.map(i => i[campoUrl]).filter(Boolean))];
-
-      urlsUnicas.forEach((url, idx) => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Anexo_${tipo.toUpperCase()}_${dataTransporteSelecionada}_${idx + 1}`;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      });
-
-      statusElement.innerText = `Download iniciado para ${urlsUnicas.length} arquivo(s) ${tipo.toUpperCase()}!`;
-    }
-  </script>
-</body>
-</html>
+          <tr class="bg-blue-100/50 font-bold border-b border-blue-200 text-blue-900">

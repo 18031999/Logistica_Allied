@@ -440,22 +440,51 @@
     return; 
   } 
 
-  status.innerText = "A cadastrar utilizador..."; 
+  status.innerText = "A verificar utilizador..."; 
   status.className = "text-xs mt-3 font-semibold text-center text-blue-600 block"; 
 
   const senhaPadrao = "Mudar123*"; 
-  const novoId = crypto.randomUUID(); // Gera um identificador único obrigatório para o ID
 
-  const { error: profileError } = await supabaseClient 
+  // 1. Verifica se o e-mail já existe na tabela profiles
+  const { data: existingUser, error: searchError } = await supabaseClient 
     .from('profiles') 
-    .upsert({ 
-      id: novoId, 
-      email: email, 
-      role: role, 
-      primeiro_acesso: true 
-    }, { 
-      onConflict: 'email' 
-    }); 
+    .select('id') 
+    .eq('email', email) 
+    .maybeSingle(); 
+
+  if (searchError) { 
+    status.innerText = "Erro ao pesquisar: " + searchError.message; 
+    status.className = "text-xs mt-3 font-semibold text-center text-red-600 block"; 
+    return; 
+  } 
+
+  let profileError = null; 
+
+  if (existingUser) { 
+    // 2A. Se já existe, atualiza apenas os dados necessários usando o ID existente
+    status.innerText = "A atualizar utilizador existente..."; 
+    const { error } = await supabaseClient 
+      .from('profiles') 
+      .update({ 
+        role: role, 
+        primeiro_acesso: true 
+      }) 
+      .eq('id', existingUser.id); 
+    profileError = error; 
+  } else { 
+    // 2B. Se não existe, insere gerando um novo ID
+    status.innerText = "A criar novo utilizador..."; 
+    const novoId = crypto.randomUUID(); 
+    const { error } = await supabaseClient 
+      .from('profiles') 
+      .insert({ 
+        id: novoId, 
+        email: email, 
+        role: role, 
+        primeiro_acesso: true 
+      }); 
+    profileError = error; 
+  } 
 
   if (profileError) { 
     status.innerText = "Erro ao cadastrar: " + profileError.message; 

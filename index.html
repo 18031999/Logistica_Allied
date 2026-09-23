@@ -440,52 +440,67 @@
     return; 
   } 
 
-  status.innerText = "A criar credenciais de acesso..."; 
+  status.innerText = "A verificar o sistema..."; 
   status.className = "text-xs mt-3 font-semibold text-center text-blue-600 block"; 
 
   const senhaPadrao = "Mudar123*"; 
 
-  // 1. Cria o utilizador na autenticação oficial do Supabase
-  const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-    email: email,
-    password: senhaPadrao,
-    options: {
-      data: {
-        role: role
+  // 1. Verifica se já existe um perfil com este e-mail
+  const { data: existingProfile } = await supabaseClient 
+    .from('profiles') 
+    .select('id') 
+    .eq('email', email) 
+    .maybeSingle(); 
+
+  let userId = existingProfile ? existingProfile.id : null; 
+
+  // 2. Se não tem perfil na tabela, tenta criar o auth user
+  if (!userId) { 
+    const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+      email: email,
+      password: senhaPadrao,
+      options: { data: { role: role } }
+    });
+
+    if (authError) {
+      // Se o erro for porque o email já existe no auth, tentamos recuperar o utilizador
+      if (authError.message.includes("already registered")) {
+        status.innerText = "Utilizador já registado no Auth. A atualizar perfil...";
+      } else {
+        status.innerText = "Erro no registo: " + authError.message; 
+        status.className = "text-xs mt-3 font-semibold text-center text-red-600 block"; 
+        return;
       }
+    } else if (authData.user) {
+      userId = authData.user.id;
     }
-  });
+  }
 
-  if (authError) {
-    status.innerText = "Erro no registo: " + authError.message; 
+  // 3. Se ainda assim não temos um ID (caso o auth já existisse mas o profile não), geramos um UUID seguro
+  if (!userId) {
+    userId = crypto.randomUUID();
+  }
+
+  // 4. Grava/Atualiza na tabela profiles utilizando o ID correto e evitando duplicados no e-mail
+  const { error: profileError } = await supabaseClient 
+    .from('profiles') 
+    .upsert({ 
+      id: userId, 
+      email: email, 
+      role: role, 
+      primeiro_acesso: true 
+    }, { 
+      onConflict: 'email' 
+    }); 
+
+  if (profileError) { 
+    status.innerText = "Erro ao guardar perfil: " + profileError.message; 
     status.className = "text-xs mt-3 font-semibold text-center text-red-600 block"; 
-    return;
-  }
-
-  // Obtém o ID gerado pelo Auth para associar na tabela profiles
-  const userId = authData.user ? authData.user.id : null;
-
-  if (userId) {
-    // 2. Insere ou atualiza o perfil associando o ID real da autenticação
-    const { error: profileError } = await supabaseClient 
-      .from('profiles') 
-      .upsert({ 
-        id: userId, 
-        email: email, 
-        role: role, 
-        primeiro_acesso: true 
-      }, { onConflict: 'id' }); 
-
-    if (profileError) { 
-      status.innerText = "Erro ao guardar perfil: " + profileError.message; 
-      status.className = "text-xs mt-3 font-semibold text-center text-red-600 block"; 
-      return;
-    } 
-  }
-
-  status.innerText = `Cadastrado com sucesso! Senha padrão inicial: ${senhaPadrao}`; 
-  status.className = "text-xs mt-3 font-semibold text-center text-green-600 block"; 
-  document.getElementById('convite-email').value = ''; 
+  } else { 
+    status.innerText = `Cadastrado/Atualizado com sucesso! Senha padrão inicial: ${senhaPadrao}`; 
+    status.className = "text-xs mt-3 font-semibold text-center text-green-600 block"; 
+    document.getElementById('convite-email').value = ''; 
+  } 
 }
 
     function fazerLogout() {

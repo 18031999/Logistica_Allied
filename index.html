@@ -188,11 +188,11 @@
 
         <div class="bg-gray-50 p-4 border rounded mb-6">
           <label class="block text-sm font-medium mb-1">Bipar Código (Trade Allied):</label>
-          <input type="text" id="input-bipagem" placeholder="Aguardando bipagem do leitor..." class="w-full border-2 border-blue-500 p-3 rounded text-lg font-mono focus:outline-none" autofocus>
+          <input type="text" id="input-bipagem" placeholder="Aguardando bipagem do leitor..." class="w-full border-2 border-blue-500 p-3 rounded text-lg font-mono focus:outline-none" autocomplete="off" autofocus>
           <p class="text-xs text-gray-500 mt-1">Pressione [ENTER] 2x para confirmar a leitura de forma definitiva.</p>
         </div>
 
-        <div id="alerta-erro-caixa" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded font-bold"></div>
+        <div id="alerta-erro-caixa" class="hidden p-4 mb-4 rounded font-bold"></div>
 
         <div class="overflow-x-auto">
           <table class="w-full text-xs text-left border">
@@ -304,8 +304,8 @@
     let usuarioAtual = null;
     let perfilUsuario = 'CONFERENCIA';
     let caixaAtualConferencia = null;
-    let teclaEnterCount = 0;
-    let tradeAguardandoConfirmacao = null;
+    let ultimoTradeBipado = null;
+    let cliquesEnterTrade = 0;
 
     let dataTransporteSelecionada = null;
     let abaAtual = 'importacao';
@@ -522,7 +522,8 @@
 
       if (nomeAba === 'logistica') carregarDadosLogistica();
       if (nomeAba === 'conferencia') {
-        document.getElementById('input-bipagem').focus();
+        const inputBip = document.getElementById('input-bipagem');
+        if (inputBip) inputBip.focus();
         carregarStatusTodasCaixas();
         if (caixaAtualConferencia) carregarItensConferencia();
       }
@@ -799,9 +800,12 @@
 
     function trocarCaixa() {
       caixaAtualConferencia = null;
+      ultimoTradeBipado = null;
+      cliquesEnterTrade = 0;
       document.getElementById('badge-caixa-status').innerText = "NENHUMA CAIXA SELECIONADA";
       document.getElementById('badge-caixa-status').className = "px-4 py-2 rounded text-white font-bold text-sm bg-gray-400";
       document.getElementById('tabela-conferencia').innerHTML = '';
+      document.getElementById('input-bipagem').focus();
     }
 
     function toggleGavetaCaixas() {
@@ -823,10 +827,13 @@
 
     async function selecionarCaixa(caixa) {
       caixaAtualConferencia = caixa;
+      ultimoTradeBipado = null;
+      cliquesEnterTrade = 0;
       document.getElementById('badge-caixa-status').innerText = `CAIXA ATIVA: ${caixa}`;
       document.getElementById('badge-caixa-status').className = "px-4 py-2 rounded text-white font-bold text-sm bg-purple-600";
       toggleGavetaCaixas();
-      carregarItensConferencia();
+      await carregarItensConferencia();
+      document.getElementById('input-bipagem').focus();
     }
 
     async function carregarItensConferencia() {
@@ -874,6 +881,7 @@
 
           if (error || !data) {
             alerta.innerText = `Código "${codigo}" não encontrado na data selecionada!`;
+            alerta.className = "p-4 mb-4 rounded font-bold bg-red-100 border-l-4 border-red-500 text-red-700";
             alerta.classList.remove('hidden');
             input.value = '';
             return;
@@ -882,7 +890,7 @@
           alerta.classList.add('hidden');
           const caixaDoItem = data.caixa;
 
-          // Se não houver caixa ativa, assume a caixa do item automaticamente
+          // Se nenhuma caixa estive selecionada, assume a caixa automaticamente
           if (!caixaAtualConferencia) {
             caixaAtualConferencia = caixaDoItem;
             document.getElementById('badge-caixa-status').innerText = `CAIXA ATIVA: ${caixaDoItem}`;
@@ -890,36 +898,39 @@
             await carregarItensConferencia();
           }
 
-          if (tradeAguardandoConfirmacao === codigo) {
-            // SEGUNDO ENTER - Confirma definitivamente
-            teclaEnterCount++;
-            if (teclaEnterCount >= 2) {
-              await supabaseClient
-                .from('dispositivos')
-                .update({ conferido: true })
-                .eq('id', data.id);
-
-              alerta.innerText = `Item ${codigo} confirmado definitivamente na Caixa ${caixaDoItem}!`;
-              alerta.className = "bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4 rounded font-bold";
-              alerta.classList.remove('hidden');
-
-              tradeAguardandoConfirmacao = null;
-              teclaEnterCount = 0;
-              input.value = '';
-              await carregarItensConferencia();
-            }
+          // Lógica dos 2 Enters
+          if (ultimoTradeBipado === codigo) {
+            cliquesEnterTrade++;
           } else {
-            // PRIMEIRO ENTER - Reconhece e avisa
-            tradeAguardandoConfirmacao = codigo;
-            teclaEnterCount = 1;
+            ultimoTradeBipado = codigo;
+            cliquesEnterTrade = 1;
+          }
 
+          if (cliquesEnterTrade >= 2) {
+            // SEGUNDO ENTER - Confirma definitivamente
+            await supabaseClient
+              .from('dispositivos')
+              .update({ conferido: true })
+              .eq('id', data.id);
+
+            alerta.innerText = `Item ${codigo} confirmado definitivamente na Caixa ${caixaDoItem}!`;
+            alerta.className = "p-4 mb-4 rounded font-bold bg-green-100 border-l-4 border-green-500 text-green-700";
+            alerta.classList.remove('hidden');
+
+            ultimoTradeBipado = null;
+            cliquesEnterTrade = 0;
+            input.value = '';
+            await carregarItensConferencia();
+          } else {
+            // PRIMEIRO ENTER - Reconhece, avisa a caixa e aguarda o 2º Enter
             if (caixaDoItem !== caixaAtualConferencia) {
               alerta.innerText = `Atenção: Este item pertence à Caixa ${caixaDoItem} (Caixa ativa atual: ${caixaAtualConferencia}). Pressione ENTER novamente para confirmar.`;
             } else {
               alerta.innerText = `Item encontrado na Caixa ${caixaDoItem}. Pressione ENTER novamente para confirmar a conferência.`;
             }
-            alerta.className = "bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 mb-4 rounded font-bold";
+            alerta.className = "p-4 mb-4 rounded font-bold bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800";
             alerta.classList.remove('hidden');
+            input.select(); // Mantém o texto selecionado para facilitar
           }
         }
       });

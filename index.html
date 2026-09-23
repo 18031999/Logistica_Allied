@@ -857,13 +857,48 @@
 
     async function carregarStatusTodasCaixas() {
       if (!dataTransporteSelecionada) return;
-      const { data } = await supabaseClient.from('dispositivos').select('caixa').eq('data_transporte', dataTransporteSelecionada);
+      
+      // Busca a caixa e o status de conferido de cada item
+      const { data } = await supabaseClient
+        .from('dispositivos')
+        .select('caixa, conferido')
+        .eq('data_transporte', dataTransporteSelecionada);
+        
       const lista = document.getElementById('lista-todas-caixas');
       lista.innerHTML = '';
       if (!data) return;
+
       const caixas = [...new Set(data.map(i => i.caixa).filter(Boolean))].sort();
+
       caixas.forEach(c => {
-        lista.innerHTML += `<div class="p-2 border rounded bg-gray-50 flex justify-between items-center text-xs font-bold"><span>Caixa ${c}</span><button onclick="selecionarCaixa('${c}')" class="bg-blue-600 text-white px-2 py-1 rounded">Selecionar</button></div>`;
+        const itensCaixa = data.filter(i => i.caixa === c);
+        const totalCaixa = itensCaixa.length;
+        const conferidosCaixa = itensCaixa.filter(i => i.conferido === true).length;
+        const estaCompleta = conferidosCaixa >= totalCaixa && totalCaixa > 0;
+
+        // Cores dinâmicas: Verde se completo, Vermelho se pendente
+        const corClasse = estaCompleta 
+          ? 'bg-green-50 border-green-500 text-green-900' 
+          : 'bg-red-50 border-red-500 text-red-900';
+          
+        const badgeCor = estaCompleta
+          ? 'bg-green-600 text-white'
+          : 'bg-red-600 text-white';
+
+        lista.innerHTML += `
+          <div class="p-3 border-2 rounded flex justify-between items-center ${corClasse}">
+            <div>
+              <span class="font-bold block">Caixa ${c}</span>
+              <span class="text-[10px] font-semibold">Conferidos: ${conferidosCaixa} / ${totalCaixa}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] px-2 py-0.5 rounded font-bold ${badgeCor}">
+                ${estaCompleta ? 'Completa' : 'Pendente'}
+              </span>
+              <button onclick="selecionarCaixa('${c}')" class="bg-blue-600 text-white text-xs px-2.5 py-1 rounded hover:bg-blue-700 font-bold">Selecionar</button>
+            </div>
+          </div>
+        `;
       });
     }
 

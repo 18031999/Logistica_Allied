@@ -438,16 +438,18 @@
 
   const senhaPadrao = "Mudar123*";
 
-  // Insere o utilizador diretamente na tabela profiles e define a flag de primeiro acesso
-  // Nota: Como o Supabase restringe a criação de auth via cliente anónimo por segurança, 
-  // gravamos o perfil associado que será reconhecido no próximo login ou sincronizado.
+  // Gera um identificador único (UUID) para preencher a coluna 'id' obrigatória
+  const novoId = crypto.randomUUID();
+
+  // Insere o perfil diretamente na tabela com o ID gerado e a flag de primeiro acesso
   const { error: profileError } = await supabaseClient
     .from('profiles')
-    .upsert({
+    .insert({
+      id: novoId,
       email: email,
       role: role,
       primeiro_acesso: true
-    }, { onConflict: 'email' });
+    });
 
   if (profileError) {
     status.innerText = "Erro ao cadastrar: " + profileError.message;
@@ -458,6 +460,8 @@
     document.getElementById('convite-email').value = '';
   }
 }
+
+
     function fazerLogout() {
       localStorage.removeItem('aba_ativa');
       supabaseClient.auth.signOut();

@@ -430,39 +430,40 @@
       document.getElementById('convite-status').classList.add('hidden');
     }
 
-    async function enviarConvite() {
-      const email = document.getElementById('convite-email').value.trim();
-      const role = document.getElementById('convite-role').value;
-      const status = document.getElementById('convite-status');
+    async function enviarConvite() { 
+  const email = document.getElementById('convite-email').value.trim(); 
+  const role = document.getElementById('convite-role').value; 
+  const status = document.getElementById('convite-status'); 
 
-      if (!email) {
-        alert("Digite um e-mail válido.");
-        return;
-      }
+  if (!email) { 
+    alert("Digite um e-mail válido."); 
+    return; 
+  } 
 
-      status.innerText = "A cadastrar utilizador...";
-      status.className = "text-xs mt-3 font-semibold text-center text-blue-600 block";
+  status.innerText = "A cadastrar utilizador..."; 
+  status.className = "text-xs mt-3 font-semibold text-center text-blue-600 block"; 
 
-      const senhaPadrao = "Mudar123*";
+  const senhaPadrao = "Mudar123*"; 
 
-      // Faz o upsert utilizando explicitamente a restrição do email
-      const { error: profileError } = await supabaseClient
-        .from('profiles')
-        .upsert({
-          email: email,
-          role: role,
-          primeiro_acesso: true
-        }, { onConflict: 'email' });
+  const { error: profileError } = await supabaseClient 
+    .from('profiles') 
+    .upsert({ 
+      email: email, 
+      role: role, 
+      primeiro_acesso: true 
+    }, { 
+      onConflict: 'email' 
+    }); 
 
-      if (profileError) {
-        status.innerText = "Erro ao cadastrar: " + profileError.message;
-        status.className = "text-xs mt-3 font-semibold text-center text-red-600 block";
-      } else {
-        status.innerText = `Cadastrado/Atualizado com sucesso! Senha padrão inicial: ${senhaPadrao}`;
-        status.className = "text-xs mt-3 font-semibold text-center text-green-600 block";
-        document.getElementById('convite-email').value = '';
-      }
-    }
+  if (profileError) { 
+    status.innerText = "Erro ao cadastrar: " + profileError.message; 
+    status.className = "text-xs mt-3 font-semibold text-center text-red-600 block"; 
+  } else { 
+    status.innerText = `Cadastrado/Atualizado com sucesso! Senha padrão inicial: ${senhaPadrao}`; 
+    status.className = "text-xs mt-3 font-semibold text-center text-green-600 block"; 
+    document.getElementById('convite-email').value = ''; 
+  } 
+}
 
     function fazerLogout() {
       localStorage.removeItem('aba_ativa');

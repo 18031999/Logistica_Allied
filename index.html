@@ -440,60 +440,52 @@
     return; 
   } 
 
-  status.innerText = "A verificar utilizador..."; 
+  status.innerText = "A criar credenciais de acesso..."; 
   status.className = "text-xs mt-3 font-semibold text-center text-blue-600 block"; 
 
   const senhaPadrao = "Mudar123*"; 
 
-  // 1. Verifica se o e-mail já existe na tabela profiles
-  const { data: existingUser, error: searchError } = await supabaseClient 
-    .from('profiles') 
-    .select('id') 
-    .eq('email', email) 
-    .maybeSingle(); 
+  // 1. Cria o utilizador na autenticação oficial do Supabase
+  const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+    email: email,
+    password: senhaPadrao,
+    options: {
+      data: {
+        role: role
+      }
+    }
+  });
 
-  if (searchError) { 
-    status.innerText = "Erro ao pesquisar: " + searchError.message; 
+  if (authError) {
+    status.innerText = "Erro no registo: " + authError.message; 
     status.className = "text-xs mt-3 font-semibold text-center text-red-600 block"; 
-    return; 
-  } 
+    return;
+  }
 
-  let profileError = null; 
+  // Obtém o ID gerado pelo Auth para associar na tabela profiles
+  const userId = authData.user ? authData.user.id : null;
 
-  if (existingUser) { 
-    // 2A. Se já existe, atualiza apenas os dados necessários usando o ID existente
-    status.innerText = "A atualizar utilizador existente..."; 
-    const { error } = await supabaseClient 
+  if (userId) {
+    // 2. Insere ou atualiza o perfil associando o ID real da autenticação
+    const { error: profileError } = await supabaseClient 
       .from('profiles') 
-      .update({ 
-        role: role, 
-        primeiro_acesso: true 
-      }) 
-      .eq('id', existingUser.id); 
-    profileError = error; 
-  } else { 
-    // 2B. Se não existe, insere gerando um novo ID
-    status.innerText = "A criar novo utilizador..."; 
-    const novoId = crypto.randomUUID(); 
-    const { error } = await supabaseClient 
-      .from('profiles') 
-      .insert({ 
-        id: novoId, 
+      .upsert({ 
+        id: userId, 
         email: email, 
         role: role, 
         primeiro_acesso: true 
-      }); 
-    profileError = error; 
-  } 
+      }, { onConflict: 'id' }); 
 
-  if (profileError) { 
-    status.innerText = "Erro ao cadastrar: " + profileError.message; 
-    status.className = "text-xs mt-3 font-semibold text-center text-red-600 block"; 
-  } else { 
-    status.innerText = `Cadastrado/Atualizado com sucesso! Senha padrão inicial: ${senhaPadrao}`; 
-    status.className = "text-xs mt-3 font-semibold text-center text-green-600 block"; 
-    document.getElementById('convite-email').value = ''; 
-  } 
+    if (profileError) { 
+      status.innerText = "Erro ao guardar perfil: " + profileError.message; 
+      status.className = "text-xs mt-3 font-semibold text-center text-red-600 block"; 
+      return;
+    } 
+  }
+
+  status.innerText = `Cadastrado com sucesso! Senha padrão inicial: ${senhaPadrao}`; 
+  status.className = "text-xs mt-3 font-semibold text-center text-green-600 block"; 
+  document.getElementById('convite-email').value = ''; 
 }
 
     function fazerLogout() {

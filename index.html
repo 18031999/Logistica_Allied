@@ -200,6 +200,7 @@
               <tr>
                 <th class="p-2 border">NF Remessa</th>
                 <th class="p-2 border">Trade Allied</th>
+                <th class="p-2 border">Atendimento</th>
                 <th class="p-2 border">IMEI</th>
                 <th class="p-2 border">SKU</th>
                 <th class="p-2 border">Caixa</th>
@@ -417,6 +418,7 @@
 
       await carregarDatasTransporteDisponiveis();
       mudarAba(abaAtual);
+      configurarLeitorBipagem();
     }
 
     function abrirModalConvite() {
@@ -522,6 +524,7 @@
       if (nomeAba === 'conferencia') {
         document.getElementById('input-bipagem').focus();
         carregarStatusTodasCaixas();
+        if (caixaAtualConferencia) carregarItensConferencia();
       }
     }
 
@@ -838,6 +841,7 @@
           <tr class="border-b ${conferido ? 'bg-green-50' : ''}">
             <td class="p-2 border">${item.nf_remessa_allied || ''}</td>
             <td class="p-2 border font-mono font-bold">${item.trade_allied || ''}</td>
+            <td class="p-2 border">${item.atendimento || ''}</td>
             <td class="p-2 border">${item.imei_allied || ''}</td>
             <td class="p-2 border">${item.sku || ''}</td>
             <td class="p-2 border">${item.caixa || ''}</td>
@@ -848,6 +852,76 @@
             <td class="p-2 border font-bold ${conferido ? 'text-green-600' : 'text-orange-500'}">${conferido ? 'CONFERIDO' : 'PENDENTE'}</td>
           </tr>
         `;
+      });
+    }
+
+    function configurarLeitorBipagem() {
+      const input = document.getElementById('input-bipagem');
+      const alerta = document.getElementById('alerta-erro-caixa');
+
+      input.addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const codigo = input.value.trim();
+          if (!codigo) return;
+
+          const { data, error } = await supabaseClient
+            .from('dispositivos')
+            .select('*')
+            .eq('data_transporte', dataTransporteSelecionada)
+            .eq('trade_allied', codigo)
+            .maybeSingle();
+
+          if (error || !data) {
+            alerta.innerText = `Código "${codigo}" não encontrado na data selecionada!`;
+            alerta.classList.remove('hidden');
+            input.value = '';
+            return;
+          }
+
+          alerta.classList.add('hidden');
+          const caixaDoItem = data.caixa;
+
+          // Se não houver caixa ativa, assume a caixa do item automaticamente
+          if (!caixaAtualConferencia) {
+            caixaAtualConferencia = caixaDoItem;
+            document.getElementById('badge-caixa-status').innerText = `CAIXA ATIVA: ${caixaDoItem}`;
+            document.getElementById('badge-caixa-status').className = "px-4 py-2 rounded text-white font-bold text-sm bg-purple-600";
+            await carregarItensConferencia();
+          }
+
+          if (tradeAguardandoConfirmacao === codigo) {
+            // SEGUNDO ENTER - Confirma definitivamente
+            teclaEnterCount++;
+            if (teclaEnterCount >= 2) {
+              await supabaseClient
+                .from('dispositivos')
+                .update({ conferido: true })
+                .eq('id', data.id);
+
+              alerta.innerText = `Item ${codigo} confirmado definitivamente na Caixa ${caixaDoItem}!`;
+              alerta.className = "bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4 rounded font-bold";
+              alerta.classList.remove('hidden');
+
+              tradeAguardandoConfirmacao = null;
+              teclaEnterCount = 0;
+              input.value = '';
+              await carregarItensConferencia();
+            }
+          } else {
+            // PRIMEIRO ENTER - Reconhece e avisa
+            tradeAguardandoConfirmacao = codigo;
+            teclaEnterCount = 1;
+
+            if (caixaDoItem !== caixaAtualConferencia) {
+              alerta.innerText = `Atenção: Este item pertence à Caixa ${caixaDoItem} (Caixa ativa atual: ${caixaAtualConferencia}). Pressione ENTER novamente para confirmar.`;
+            } else {
+              alerta.innerText = `Item encontrado na Caixa ${caixaDoItem}. Pressione ENTER novamente para confirmar a conferência.`;
+            }
+            alerta.className = "bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 mb-4 rounded font-bold";
+            alerta.classList.remove('hidden');
+          }
+        }
       });
     }
 

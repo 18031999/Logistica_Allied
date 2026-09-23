@@ -1020,7 +1020,7 @@
       statusEl.innerText = "A enviar arquivo...";
       
       const caminho = `${dataTransporteSelecionada}/${tipo}/${file.name}`;
-      const { error } = await supabaseClient.storage.from('notas-fiscais').upload(caminho, file, { upsert: true });
+      const { error } = await supabaseClient.storage.from('anexos_notas').upload(caminho, file, { upsert: true });
       
       if (error) {
         statusEl.innerText = "Erro ao enviar: " + error.message;
@@ -1034,14 +1034,14 @@
       const statusEl = document.getElementById('status-download-anexos');
       statusEl.innerText = "A procurar arquivos...";
       
-      const { data, error } = await supabaseClient.storage.from('notas-fiscais').list(`${dataTransporteSelecionada}/${tipo}`);
+      const { data, error } = await supabaseClient.storage.from('anexos_notas').list(`${dataTransporteSelecionada}/${tipo}`);
       if (error || !data || data.length === 0) {
         statusEl.innerText = "Nenhum arquivo encontrado para esta data.";
         return;
       }
 
       for (const arquivo of data) {
-        const { data: fileData } = await supabaseClient.storage.from('notas-fiscais').download(`${dataTransporteSelecionada}/${tipo}/${arquivo.name}`);
+        const { data: fileData } = await supabaseClient.storage.from('anexos_notas').download(`${dataTransporteSelecionada}/${tipo}/${arquivo.name}`);
         if (fileData) {
           const blobUrl = URL.createObjectURL(fileData);
           const a = document.createElement('a');

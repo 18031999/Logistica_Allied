@@ -390,13 +390,19 @@
     }
 
     async function carregarPerfilUsuario() {
-      if (usuarioAtual && usuarioAtual.email === 'm.silva@ctdi.com') {
-        perfilUsuario = 'ADM';
+      if (!usuarioAtual || !usuarioAtual.email) {
+        perfilUsuario = 'CONFERENCIA';
         return;
       }
 
       try {
-        const { data } = await supabaseClient.from('profiles').select('role').eq('id', usuarioAtual.id).maybeSingle();
+        // Procura diretamente pelo e-mail do utilizador logado, evitando conflitos de ID
+        const { data, error } = await supabaseClient
+          .from('profiles')
+          .select('role, primeiro_acesso')
+          .eq('email', usuarioAtual.email)
+          .maybeSingle();
+
         if (data && data.role) {
           perfilUsuario = String(data.role).trim().toUpperCase();
         } else {
@@ -1016,3 +1022,4 @@
   </script>
 </body>
 </html>
+    

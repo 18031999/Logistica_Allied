@@ -449,7 +449,7 @@
   status.innerText = "A processar utilizador..."; 
   status.className = "text-xs mt-3 font-semibold text-center text-blue-600 block"; 
 
-  const senhaPadrao = "Mudar123*"; 
+  const senhaPadrao = "Ctdi123"; 
 
   // 1. Tenta criar o utilizador no Auth do Supabase (ignora se já existir)
   const { data: authData, error: authError } = await supabaseClient.auth.signUp({
@@ -1022,4 +1022,3 @@
   </script>
 </body>
 </html>
-    

@@ -444,10 +444,12 @@
   status.className = "text-xs mt-3 font-semibold text-center text-blue-600 block"; 
 
   const senhaPadrao = "Mudar123*"; 
+  const novoId = crypto.randomUUID(); // Gera um identificador único obrigatório para o ID
 
   const { error: profileError } = await supabaseClient 
     .from('profiles') 
     .upsert({ 
+      id: novoId, 
       email: email, 
       role: role, 
       primeiro_acesso: true 

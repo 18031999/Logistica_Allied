@@ -107,14 +107,20 @@
               <option value="">Todos os Status</option>
             </select>
           </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-600 mb-1">Pesquisar Trade Allied:</label>
+            <input type="text" id="filtro-trade" placeholder="Digite o Trade..." oninput="aplicarFiltrosLogistica()" class="border p-1.5 rounded text-xs bg-white w-40">
+          </div>
           <button onclick="limparFiltrosLogistica()" class="mt-4 bg-gray-500 text-white text-xs px-3 py-1.5 rounded hover:bg-gray-600 font-semibold">Limpar Filtros</button>
         </div>
 
         <!-- ATRIBUIÇÃO EM LOTE -->
         <div class="bg-blue-50 border border-blue-200 p-3 rounded mb-4 flex flex-wrap gap-3 items-center">
           <span class="text-xs font-bold text-blue-800">Atribuir em Lote (<span id="count-selecionados">0</span> selecionados):</span>
-          <input type="text" id="lote-nf-retorno" placeholder="NF Retorno" class="border p-1.5 rounded text-xs w-32">
-          <input type="text" id="lote-pedido" placeholder="Pedido" class="border p-1.5 rounded text-xs w-32">
+          <input type="text" id="lote-nf-peca" placeholder="NF Peça" class="border p-1.5 rounded text-xs w-28">
+          <input type="text" id="lote-nf-servico" placeholder="NF Serviço" class="border p-1.5 rounded text-xs w-28">
+          <input type="text" id="lote-nf-retorno" placeholder="NF Retorno" class="border p-1.5 rounded text-xs w-28">
+          <input type="text" id="lote-pedido" placeholder="Pedido" class="border p-1.5 rounded text-xs w-28">
           <button onclick="aplicarEmLoteLogistica()" class="bg-blue-600 text-white text-xs px-4 py-1.5 rounded hover:bg-blue-700 font-bold">Aplicar a Todos Selecionados</button>
         </div>
 
@@ -604,11 +610,13 @@
     function aplicarFiltrosLogistica() {
       const nfFiltro = document.getElementById('filtro-nf-entrada').value;
       const statusFiltro = document.getElementById('filtro-status').value;
+      const tradeFiltro = document.getElementById('filtro-trade').value.trim().toLowerCase();
 
       dadosFiltradosLogistica = todosDadosLogistica.filter(item => {
         const matchNf = !nfFiltro || String(item.nf_remessa_allied) === String(nfFiltro);
         const matchStatus = !statusFiltro || String(item.status_orcamento) === String(statusFiltro);
-        return matchNf && matchStatus;
+        const matchTrade = !tradeFiltro || String(item.trade_allied || '').toLowerCase().includes(tradeFiltro);
+        return matchNf && matchStatus && matchTrade;
       });
 
       renderizarTabelaLogistica();
@@ -618,6 +626,7 @@
     function limparFiltrosLogistica() {
       document.getElementById('filtro-nf-entrada').value = '';
       document.getElementById('filtro-status').value = '';
+      document.getElementById('filtro-trade').value = '';
       aplicarFiltrosLogistica();
     }
 
@@ -731,16 +740,20 @@
         return;
       }
 
+      const nfPeca = document.getElementById('lote-nf-peca').value.trim();
+      const nfServico = document.getElementById('lote-nf-servico').value.trim();
       const nfRetorno = document.getElementById('lote-nf-retorno').value.trim();
       const pedido = document.getElementById('lote-pedido').value.trim();
 
-      if (!nfRetorno && !pedido) {
-        alert("Preencha pelo menos a NF Retorno ou o Pedido para aplicar em lote.");
+      if (!nfPeca && !nfServico && !nfRetorno && !pedido) {
+        alert("Preencha pelo menos um dos campos para aplicar em lote.");
         return;
       }
 
       const ids = Array.from(checks).map(ch => ch.value);
       const dadosUpdate = {};
+      if (nfPeca) dadosUpdate.nf_peca = nfPeca;
+      if (nfServico) dadosUpdate.nf_servico = nfServico;
       if (nfRetorno) dadosUpdate.nf_retorno = nfRetorno;
       if (pedido) dadosUpdate.pedido = pedido;
 
@@ -753,6 +766,8 @@
         alert("Erro ao aplicar em lote: " + error.message);
       } else {
         alert("Alterações em lote aplicadas com sucesso!");
+        document.getElementById('lote-nf-peca').value = '';
+        document.getElementById('lote-nf-servico').value = '';
         document.getElementById('lote-nf-retorno').value = '';
         document.getElementById('lote-pedido').value = '';
         carregarDadosLogistica();
@@ -779,7 +794,6 @@
       }
     }
 
-    // Funções auxiliares para conferência e arquivos (mantidas integradas)
     function trocarCaixa() {
       caixaAtualConferencia = null;
       document.getElementById('badge-caixa-status').innerText = "NENHUMA CAIXA SELECIONADA";

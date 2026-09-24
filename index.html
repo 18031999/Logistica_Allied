@@ -922,6 +922,7 @@
       if (!data) return;
       data.forEach(item => {
         const conferido = item.conferido === true;
+        const statusOrcamento = item.status_orcamento || '-'; // Pega o status do orçamento
         tbody.innerHTML += `
           <tr class="border-b ${conferido ? 'bg-green-50' : ''}">
             <td class="p-2 border">${item.nf_remessa_allied || ''}</td>
@@ -935,6 +936,7 @@
             <td class="p-2 border">${item.nf_servico || ''}</td>
             <td class="p-2 border">${item.nf_retorno || ''}</td>
             <td class="p-2 border font-bold ${conferido ? 'text-green-600' : 'text-orange-500'}">${conferido ? 'CONFERIDO' : 'PENDENTE'}</td>
+            <td class="p-2 border font-semibold">${statusOrcamento}</td>
           </tr>
         `;
       });

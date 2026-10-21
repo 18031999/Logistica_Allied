@@ -243,9 +243,13 @@
             <p class="text-xs text-emerald-700 mb-4 max-w-xs">Anexe o arquivo XML referente às notas de retorno da data ativa.</p>
             <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-lg shadow inline-flex items-center gap-2 transition-transform active:scale-95">
               <span>Selecionar & Enviar XML</span>
-              <input type="file" id="btn-upload-xml" accept=".xml" onchange="uploadArquivoEspecial(event, 'xml')" class="hidden">
+              <input type="file" id="btn-upload-xml" accept=".xml" multiple onchange="uploadArquivoEspecial(event, 'xml')" class="hidden">
             </label>
             <span id="status-upload-xml" class="text-xs font-semibold mt-3 text-emerald-800"></span>
+            <div class="w-full mt-4 text-left">
+              <h4 class="text-xs font-bold text-emerald-900 mb-2">XMLs anexados</h4>
+              <div id="lista-arquivos-xml" class="space-y-2 text-xs"></div>
+            </div>
           </div>
 
           <div class="border-2 border-dashed border-red-300 bg-red-50/50 rounded-xl p-6 text-center hover:bg-red-50 transition-colors flex flex-col items-center justify-center">
@@ -254,9 +258,13 @@
             <p class="text-xs text-red-700 mb-4 max-w-xs">Anexe o documento DANFE em formato PDF correspondente.</p>
             <label class="cursor-pointer bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-5 py-2.5 rounded-lg shadow inline-flex items-center gap-2 transition-transform active:scale-95">
               <span>Selecionar & Enviar PDF</span>
-              <input type="file" id="btn-upload-pdf" accept=".pdf" onchange="uploadArquivoEspecial(event, 'pdf')" class="hidden">
+              <input type="file" id="btn-upload-pdf" accept=".pdf" multiple onchange="uploadArquivoEspecial(event, 'pdf')" class="hidden">
             </label>
             <span id="status-upload-pdf" class="text-xs font-semibold mt-3 text-red-800"></span>
+            <div class="w-full mt-4 text-left">
+              <h4 class="text-xs font-bold text-red-900 mb-2">PDFs anexados</h4>
+              <div id="lista-arquivos-pdf" class="space-y-2 text-xs"></div>
+            </div>
           </div>
         </div>
 
@@ -570,6 +578,10 @@
       }
 
       if (nomeAba === 'logistica') carregarDadosLogistica();
+      if (nomeAba === 'notas') {
+        listarArquivosAnexados('xml');
+        listarArquivosAnexados('pdf');
+      }
       if (nomeAba === 'conferencia') {
         const inputBip = document.getElementById('input-bipagem');
         if (inputBip) inputBip.focus();
@@ -1033,20 +1045,109 @@
     }
 
     async function uploadArquivoEspecial(event, tipo) {
-      const file = event.target.files[0];
-      if (!file || !dataTransporteSelecionada) return;
+      const arquivos = Array.from(event.target.files || []);
       const statusEl = document.getElementById(`status-upload-${tipo}`);
-      statusEl.innerText = "A enviar arquivo...";
-      
-      const caminho = `${dataTransporteSelecionada}/${tipo}/${file.name}`;
-      // Alterado de 'notas-fiscais' para 'anexos_notas'
-      const { error } = await supabaseClient.storage.from('anexos_notas').upload(caminho, file, { upsert: true });
-      
-      if (error) {
-        statusEl.innerText = "Erro ao enviar: " + error.message;
-      } else {
-        statusEl.innerText = "Arquivo enviado com sucesso!";
+
+      if (arquivos.length === 0) return;
+      if (!dataTransporteSelecionada) {
+        statusEl.innerText = "Selecione uma data de transporte antes de anexar arquivos.";
+        event.target.value = '';
+        return;
       }
+
+      let enviados = 0;
+      const erros = [];
+      statusEl.innerText = `Enviando ${arquivos.length} arquivo(s)...`;
+
+      for (const file of arquivos) {
+        const caminho = `${dataTransporteSelecionada}/${tipo}/${file.name}`;
+        const { error } = await supabaseClient.storage
+          .from('anexos_notas')
+          .upload(caminho, file, { upsert: true });
+
+        if (error) {
+          erros.push(`${file.name}: ${error.message}`);
+        } else {
+          enviados++;
+        }
+      }
+
+      if (erros.length > 0) {
+        statusEl.innerText = `${enviados} arquivo(s) enviado(s). Erros: ${erros.join(' | ')}`;
+      } else {
+        statusEl.innerText = `${enviados} arquivo(s) enviado(s) com sucesso!`;
+      }
+
+      event.target.value = '';
+      await listarArquivosAnexados(tipo);
+    }
+
+    async function listarArquivosAnexados(tipo) {
+      const lista = document.getElementById(`lista-arquivos-${tipo}`);
+      if (!lista) return;
+      lista.innerHTML = '';
+
+      if (!dataTransporteSelecionada) {
+        lista.innerText = 'Selecione uma data de transporte.';
+        return;
+      }
+
+      const { data, error } = await supabaseClient.storage
+        .from('anexos_notas')
+        .list(`${dataTransporteSelecionada}/${tipo}`, {
+          sortBy: { column: 'name', order: 'asc' }
+        });
+
+      if (error) {
+        lista.innerText = 'Erro ao carregar arquivos: ' + error.message;
+        return;
+      }
+
+      const arquivos = (data || []).filter(arquivo => arquivo.name && arquivo.name !== '.emptyFolderPlaceholder');
+      if (arquivos.length === 0) {
+        lista.innerText = 'Nenhum arquivo anexado.';
+        return;
+      }
+
+      arquivos.forEach(arquivo => {
+        const linha = document.createElement('div');
+        linha.className = 'flex items-center justify-between gap-2 border rounded p-2 bg-white';
+
+        const nome = document.createElement('span');
+        nome.className = 'break-all flex-1 text-gray-700';
+        nome.textContent = arquivo.name;
+
+        const botaoApagar = document.createElement('button');
+        botaoApagar.type = 'button';
+        botaoApagar.className = 'shrink-0 bg-red-600 hover:bg-red-700 text-white font-bold px-2 py-1 rounded';
+        botaoApagar.textContent = 'Apagar';
+        botaoApagar.onclick = () => apagarArquivoAnexado(tipo, arquivo.name);
+
+        linha.appendChild(nome);
+        linha.appendChild(botaoApagar);
+        lista.appendChild(linha);
+      });
+    }
+
+    async function apagarArquivoAnexado(tipo, nomeArquivo) {
+      if (!dataTransporteSelecionada) return;
+
+      const confirmado = confirm(`Tem certeza que deseja apagar o arquivo "${nomeArquivo}"?`);
+      if (!confirmado) return;
+
+      const caminho = `${dataTransporteSelecionada}/${tipo}/${nomeArquivo}`;
+      const { error } = await supabaseClient.storage
+        .from('anexos_notas')
+        .remove([caminho]);
+
+      const statusEl = document.getElementById(`status-upload-${tipo}`);
+      if (error) {
+        statusEl.innerText = 'Erro ao apagar arquivo: ' + error.message;
+        return;
+      }
+
+      statusEl.innerText = `Arquivo "${nomeArquivo}" apagado com sucesso.`;
+      await listarArquivosAnexados(tipo);
     }
 
     async function baixarArquivosAnexados(tipo) {

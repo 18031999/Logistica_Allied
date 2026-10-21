@@ -108,6 +108,12 @@
             </select>
           </div>
           <div>
+            <label class="block text-xs font-bold text-gray-600 mb-1">Filtrar Caixa:</label>
+            <select id="filtro-caixa" onchange="aplicarFiltrosLogistica()" class="border p-1.5 rounded text-xs bg-white min-w-[180px]">
+              <option value="">Todas as Caixas</option>
+            </select>
+          </div>
+          <div>
             <label class="block text-xs font-bold text-gray-600 mb-1">Pesquisar Trade Allied:</label>
             <input type="text" id="filtro-trade" placeholder="Digite o Trade..." oninput="aplicarFiltrosLogistica()" class="border p-1.5 rounded text-xs bg-white w-40">
           </div>
@@ -638,12 +644,15 @@
     function preencherOpcoesFiltros() {
       const selectNf = document.getElementById('filtro-nf-entrada');
       const selectStatus = document.getElementById('filtro-status');
+      const selectCaixa = document.getElementById('filtro-caixa');
 
       const valNfAtual = selectNf.value;
       const valStatusAtual = selectStatus.value;
+      const valCaixaAtual = selectCaixa.value;
 
       const nfs = [...new Set(todosDadosLogistica.map(i => i.nf_remessa_allied).filter(Boolean))];
       const statusList = [...new Set(todosDadosLogistica.map(i => i.status_orcamento).filter(Boolean))];
+      const caixas = [...new Set(todosDadosLogistica.map(i => i.caixa).filter(Boolean))].sort();
 
       selectNf.innerHTML = '<option value="">Todas as NFs</option>';
       nfs.forEach(nf => { selectNf.innerHTML += `<option value="${nf}">${nf}</option>`; });
@@ -652,18 +661,24 @@
       selectStatus.innerHTML = '<option value="">Todos os Status</option>';
       statusList.forEach(st => { selectStatus.innerHTML += `<option value="${st}">${st}</option>`; });
       selectStatus.value = valStatusAtual;
+
+      selectCaixa.innerHTML = '<option value="">Todas as Caixas</option>';
+      caixas.forEach(caixa => { selectCaixa.innerHTML += `<option value="${caixa}">${caixa}</option>`; });
+      selectCaixa.value = valCaixaAtual;
     }
 
     function aplicarFiltrosLogistica() {
       const nfFiltro = document.getElementById('filtro-nf-entrada').value;
       const statusFiltro = document.getElementById('filtro-status').value;
+      const caixaFiltro = document.getElementById('filtro-caixa').value;
       const tradeFiltro = document.getElementById('filtro-trade').value.trim().toLowerCase();
 
       dadosFiltradosLogistica = todosDadosLogistica.filter(item => {
         const matchNf = !nfFiltro || String(item.nf_remessa_allied) === String(nfFiltro);
         const matchStatus = !statusFiltro || String(item.status_orcamento) === String(statusFiltro);
+        const matchCaixa = !caixaFiltro || String(item.caixa) === String(caixaFiltro);
         const matchTrade = !tradeFiltro || String(item.trade_allied || '').toLowerCase().includes(tradeFiltro);
-        return matchNf && matchStatus && matchTrade;
+        return matchNf && matchStatus && matchCaixa && matchTrade;
       });
 
       renderizarTabelaLogistica();
@@ -673,6 +688,7 @@
     function limparFiltrosLogistica() {
       document.getElementById('filtro-nf-entrada').value = '';
       document.getElementById('filtro-status').value = '';
+      document.getElementById('filtro-caixa').value = '';
       document.getElementById('filtro-trade').value = '';
       aplicarFiltrosLogistica();
     }

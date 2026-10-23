@@ -236,6 +236,16 @@
         <h2 class="text-lg font-bold mb-2">Anexo e Download de Arquivos (XML / PDF)</h2>
         <p class="text-xs text-gray-500 mb-6">A Logística realiza o upload dos arquivos e qualquer usuário pode baixá-los diretamente.</p>
 
+        <div class="mb-6 p-4 rounded-lg border border-blue-200 bg-blue-50 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-blue-900">Romaneio de Coleta</h3>
+            <p class="text-xs text-blue-800">Gere o romaneio da data de transporte selecionada, com volumes calculados pelas caixas distintas.</p>
+          </div>
+          <button onclick="gerarRomaneio()" class="bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold px-5 py-2.5 rounded shadow">
+            🖨️ Gerar Romaneio
+          </button>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div class="border-2 border-dashed border-emerald-300 bg-emerald-50/50 rounded-xl p-6 text-center hover:bg-emerald-50 transition-colors flex flex-col items-center justify-center">
             <div class="text-4xl mb-3">📄</div>
@@ -1148,6 +1158,156 @@
 
       statusEl.innerText = `Arquivo "${nomeArquivo}" apagado com sucesso.`;
       await listarArquivosAnexados(tipo);
+    }
+
+    async function gerarRomaneio() {
+      if (!dataTransporteSelecionada) {
+        alert('Selecione uma data de transporte antes de gerar o romaneio.');
+        return;
+      }
+
+      // Abre a janela imediatamente no clique para evitar bloqueio de pop-ups.
+      const janela = window.open('', '_blank');
+      if (!janela) {
+        alert('O navegador bloqueou a janela do romaneio. Permita pop-ups para este site e tente novamente.');
+        return;
+      }
+      janela.document.write('<p style="font-family:Arial;padding:20px">Preparando romaneio...</p>');
+
+      const { data, error } = await supabaseClient
+        .from('dispositivos')
+        .select('nf_remessa_allied, status_orcamento, nf_retorno, caixa, data_transporte')
+        .eq('data_transporte', dataTransporteSelecionada)
+        .order('nf_remessa_allied', { ascending: true });
+
+      if (error) {
+        janela.close();
+        alert('Não foi possível carregar os dados para o romaneio: ' + error.message);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        janela.close();
+        alert('Não existem registros para a data de transporte selecionada.');
+        return;
+      }
+
+      // Agrupa por NF Remessa, Status e NF CTDI (campo NF Retorno).
+      // O volume é a quantidade de caixas distintas dentro de cada grupo.
+      const grupos = new Map();
+      data.forEach(item => {
+        const nfRemessa = String(item.nf_remessa_allied || '').trim();
+        const status = String(item.status_orcamento || '').trim();
+        const nfCtdi = String(item.nf_retorno || '').trim();
+        const caixa = String(item.caixa || '').trim();
+        const chave = JSON.stringify([nfRemessa, status, nfCtdi]);
+
+        if (!grupos.has(chave)) {
+          grupos.set(chave, {
+            nfRemessa: nfRemessa || '-',
+            status: status || '-',
+            nfCtdi: nfCtdi || '-',
+            caixas: new Set()
+          });
+        }
+        if (caixa) grupos.get(chave).caixas.add(caixa);
+      });
+
+      const linhas = Array.from(grupos.values()).map(item => ({
+        ...item,
+        volume: item.caixas.size
+      })).sort((a, b) => {
+        const nfCompare = a.nfRemessa.localeCompare(b.nfRemessa, 'pt-BR', { numeric: true });
+        if (nfCompare !== 0) return nfCompare;
+        return a.status.localeCompare(b.status, 'pt-BR');
+      });
+
+      const totalVolumes = linhas.reduce((total, item) => total + item.volume, 0);
+      const dataFormatada = dataTransporteSelecionada.split('-').reverse().join('/');
+      const escapar = valor => String(valor ?? '').replace(/[&<>"']/g, caractere => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[caractere]));
+
+      const linhasHtml = linhas.map(item => `
+        <tr>
+          <td>${escapar(item.nfRemessa)}</td>
+          <td class="status">${escapar(item.status)}</td>
+          <td class="center">${escapar(item.nfCtdi)}</td>
+          <td class="center">${item.volume}</td>
+          <td class="cliente">ALLIED</td>
+        </tr>
+      `).join('');
+
+      janela.document.open();
+      janela.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Romaneio de Coleta - ${escapar(dataFormatada)}</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: #000; font-family: Arial, Helvetica, sans-serif; font-size: 11px; }
+  .sheet { width: 100%; border: 1px solid #111; }
+  .top { display: grid; grid-template-columns: 1fr 180px; min-height: 57px; border-bottom: 1px solid #111; }
+  .heading { text-align: center; font-size: 24px; line-height: 1.45; padding: 0 8px; }
+  .brand { display: flex; flex-direction: column; justify-content: center; align-items: flex-end; padding: 6px 10px; font-weight: bold; }
+  .brand-mark { font-size: 25px; letter-spacing: 5px; color: #1d477f; }
+  .brand-sub { font-size: 9px; color: #1d477f; letter-spacing: 2px; }
+  .company { text-align: right; border-bottom: 1px solid #111; padding: 4px 8px; font-weight: bold; }
+  .meta div { min-height: 21px; border-bottom: 1px solid #111; padding: 3px 5px; }
+  .meta strong { font-weight: bold; }
+  .meta .last { display: grid; grid-template-columns: 1fr 165px; border-bottom: 0; }
+  .field { display: inline-block; min-width: 190px; padding: 0 4px; outline: none; }
+  .date { text-align: right; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  thead th { background: #b7b7b7; border: 1px solid #888; text-align: center; font-size: 12px; padding: 4px 3px; }
+  tbody td { border: 0; padding: 4px 5px; height: 19px; font-size: 11px; }
+  tbody tr { break-inside: avoid; }
+  td.status { font-weight: bold; }
+  .center { text-align: center; }
+  .cliente { text-align: right; }
+  .bottom { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #111; min-height: 42px; }
+  .signature { display: flex; align-items: flex-end; padding: 7px 16px; border-right: 1px solid #111; font-weight: bold; }
+  .total { display: flex; align-items: flex-end; justify-content: space-between; padding: 7px 10px; font-weight: bold; }
+  .actions { margin: 12px 0; display: flex; gap: 8px; }
+  .actions button { padding: 8px 14px; cursor: pointer; }
+  @media print { .actions { display: none; } .field { border: 0; } }
+</style>
+</head>
+<body>
+<div class="actions">
+  <button onclick="window.print()">Imprimir / Salvar como PDF</button>
+  <button onclick="window.close()">Fechar</button>
+  <span style="align-self:center;color:#555">Você pode editar os campos do cabeçalho antes de imprimir.</span>
+</div>
+<div class="sheet">
+  <div class="top">
+    <div class="heading">ROMANEIO DE COLETA<br>CLIENTE RETIRA</div>
+    <div class="brand"><div class="brand-mark">◇C T D I◇</div><div class="brand-sub">CTDI do Brasil Ltda.</div></div>
+  </div>
+  <div class="company">CTDI PIN</div>
+  <div class="meta">
+    <div><strong>RESPONSÁVEL PELA EXPEDIÇÃO:</strong> <span class="field" contenteditable="true"></span></div>
+    <div><strong>TRANSPORTADORA:</strong> <span class="field" contenteditable="true">GILCARGO</span></div>
+    <div><strong>MOTORISTA:</strong> <span class="field" contenteditable="true">Gilberto Barbosa da Silva</span></div>
+    <div><strong>DOCUMENTO:</strong> <span class="field" contenteditable="true">409.431.378-88</span></div>
+    <div class="last"><div><strong>PLACA DO VEÍCULO:</strong> <span class="field" contenteditable="true">BFZ7855</span></div><div class="date"><strong>DATA:</strong> &nbsp; <span contenteditable="true">${escapar(dataFormatada)}</span></div></div>
+  </div>
+  <table>
+    <colgroup><col style="width:11%"><col style="width:17%"><col style="width:23%"><col style="width:24%"><col style="width:25%"></colgroup>
+    <thead><tr><th>NF REMESSA</th><th>STATUS</th><th>NF CTDI</th><th>VOLUME</th><th>CLIENTE</th></tr></thead>
+    <tbody>${linhasHtml}</tbody>
+  </table>
+  <div class="bottom">
+    <div class="signature">Assinatura</div>
+    <div class="total"><span>TOTAL:</span><span>${totalVolumes}</span></div>
+  </div>
+</div>
+</body>
+</html>`);
+      janela.document.close();
     }
 
     async function baixarArquivosAnexados(tipo) {

@@ -1217,6 +1217,15 @@
         ...item,
         volume: item.caixas.size
       })).sort((a, b) => {
+        // NF CTDI do maior para o menor (itens sem NF CTDI ficam por último)
+        const aVazio = a.nfCtdi === '-';
+        const bVazio = b.nfCtdi === '-';
+        if (aVazio !== bVazio) return aVazio ? 1 : -1;
+
+        const ctdiCompare = b.nfCtdi.localeCompare(a.nfCtdi, 'pt-BR', { numeric: true });
+        if (ctdiCompare !== 0) return ctdiCompare;
+
+        // Desempate: NF Remessa e depois Status
         const nfCompare = a.nfRemessa.localeCompare(b.nfRemessa, 'pt-BR', { numeric: true });
         if (nfCompare !== 0) return nfCompare;
         return a.status.localeCompare(b.status, 'pt-BR');

@@ -241,9 +241,14 @@
             <h3 class="text-sm font-bold text-blue-900">Romaneio de Coleta</h3>
             <p class="text-xs text-blue-800">Gere o romaneio da data de transporte selecionada.</p>
           </div>
-          <button onclick="gerarRomaneio()" class="bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold px-5 py-2.5 rounded shadow">
-            🖨️ Gerar Romaneio
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="gerarRomaneio()" class="bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold px-5 py-2.5 rounded shadow">
+              🖨️ Gerar Romaneio
+            </button>
+            <button onclick="imprimirEtiquetas()" class="bg-purple-700 hover:bg-purple-800 text-white text-sm font-bold px-5 py-2.5 rounded shadow">
+              🏷️ Imprimir Etiquetas
+            </button>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -538,73 +543,30 @@
       window.location.reload();
     }
 
-    function formatarDataBR(dataISO) {
-      if (!dataISO) return '';
-      const somenteData = String(dataISO).substring(0, 10);
-      const [ano, mes, dia] = somenteData.split('-');
-      if (!ano || !mes || !dia) return dataISO;
-      return `${dia}/${mes}/${ano}`;
-    }
-
-    async function carregarDatasTransporteDisponiveis(dataPreferida = null) {
+    async function carregarDatasTransporteDisponiveis() {
+      const { data } = await supabaseClient.from('dispositivos').select('data_transporte');
       const selectGlobal = document.getElementById('filtro-data-global');
-      selectGlobal.innerHTML = '<option value="">Carregando datas...</option>';
 
-      try {
-        let todosRegistros = [];
-        let inicio = 0;
-        const tamanhoPagina = 1000;
-
-        while (true) {
-          const fim = inicio + tamanhoPagina - 1;
-          const { data, error } = await supabaseClient
-            .from('dispositivos')
-            .select('data_transporte')
-            .not('data_transporte', 'is', null)
-            .order('data_transporte', { ascending: false })
-            .range(inicio, fim);
-
-          if (error) throw error;
-          todosRegistros.push(...(data || []));
-          if (!data || data.length < tamanhoPagina) break;
-          inicio += tamanhoPagina;
-        }
-
-        const datasUnicas = [...new Set(
-          todosRegistros
-            .map(item => String(item.data_transporte || '').substring(0, 10))
-            .filter(Boolean)
-        )].sort((a, b) => b.localeCompare(a));
-
-        if (datasUnicas.length === 0) {
-          selectGlobal.innerHTML = '<option value="">Sem entregas registradas</option>';
-          dataTransporteSelecionada = null;
-          return;
-        }
-
-        selectGlobal.innerHTML = '';
-        datasUnicas.forEach(dataISO => {
-          const option = document.createElement('option');
-          option.value = dataISO;
-          option.textContent = formatarDataBR(dataISO);
-          selectGlobal.appendChild(option);
-        });
-
-        const dataSalva = localStorage.getItem('data_transporte_ativa');
-        if (dataPreferida && datasUnicas.includes(dataPreferida)) {
-          dataTransporteSelecionada = dataPreferida;
-        } else if (dataSalva && datasUnicas.includes(dataSalva)) {
-          dataTransporteSelecionada = dataSalva;
-        } else {
-          dataTransporteSelecionada = datasUnicas[0];
-        }
-
-        selectGlobal.value = dataTransporteSelecionada;
-        localStorage.setItem('data_transporte_ativa', dataTransporteSelecionada);
-      } catch (erro) {
-        console.error('Erro ao carregar datas:', erro);
-        selectGlobal.innerHTML = '<option value="">Erro ao carregar datas</option>';
+      if (!data || data.length === 0) {
+        selectGlobal.innerHTML = '<option value="">Sem entregas registradas</option>';
+        return;
       }
+
+      const datasUnicas = [...new Set(data.map(i => i.data_transporte).filter(Boolean))].sort().reverse();
+
+      selectGlobal.innerHTML = '';
+      datasUnicas.forEach(dt => {
+        selectGlobal.innerHTML += `<option value="${dt}">${dt}</option>`;
+      });
+
+      const dataSalva = localStorage.getItem('data_transporte_ativa');
+      if (dataSalva && datasUnicas.includes(dataSalva)) {
+        dataTransporteSelecionada = dataSalva;
+      } else {
+        dataTransporteSelecionada = datasUnicas[0];
+      }
+
+      selectGlobal.value = dataTransporteSelecionada;
     }
 
     function alterarDataGlobal(novaData) {
@@ -645,96 +607,51 @@
 
     async function processarExcel() {
       if (perfilUsuario !== 'ADM') {
-        alert('Apenas o perfil ADM pode carregar planilhas.');
+        alert("Apenas o perfil ADM pode carregar planilhas.");
         return;
       }
 
       const fileInput = document.getElementById('excel-file');
       const dataSaida = document.getElementById('data-transporte').value;
-      const statusImportacao = document.getElementById('status-importacao');
 
       if (!fileInput.files.length || !dataSaida) {
-        alert('Por favor, selecione um arquivo e informe a Data de Saída.');
+        alert("Por favor, selecione um arquivo e informe a Data de Saída.");
         return;
       }
 
-      statusImportacao.className = 'mt-4 text-sm font-semibold text-blue-600';
-      statusImportacao.innerText = 'Lendo e importando a planilha...';
-
-      try {
-        const arquivo = fileInput.files[0];
-        const buffer = await arquivo.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
-
-        if (!rows.length) throw new Error('A planilha não possui registros para importar.');
+        const rows = XLSX.utils.sheet_to_json(sheet);
 
         const dadosParaInserir = rows.map(r => ({
-          trade_allied: String(r['Trade Allied'] || r['TRADE ALLIED'] || '').trim(),
-          nf_remessa_allied: String(r['NF Remessa Allied'] || r['NF Remessa'] || r['NF REMESSA'] || '').trim(),
-          atendimento: String(r['Atendimento'] || r['ATENDIMENTO'] || '').trim(),
-          imei_allied: String(r['IMEI Allied'] || r['IMEI'] || '').trim(),
-          sku: String(r['SKU'] || '').trim(),
-          status_orcamento: String(r['STATUS ORÇAMENTO'] || r['Status Orçamento'] || '').trim(),
-          lote: String(r['LOTE'] || r['Lote'] || '').trim(),
-          nf_peca: String(r['NF PEÇA'] || r['NF Peca'] || '').trim(),
-          nf_servico: String(r['NF SERVIÇO'] || r['NF Servico'] || '').trim(),
-          caixa: String(r['CAIXA'] || r['Caixa'] || '').trim(),
+          trade_allied: String(r['Trade Allied'] || r['TRADE ALLIED'] || ''),
+          nf_remessa_allied: String(r['NF Remessa Allied'] || r['NF Remessa'] || r['NF REMESSA'] || ''),
+          atendimento: String(r['Atendimento'] || ''),
+          imei_allied: String(r['IMEI Allied'] || r['IMEI'] || ''),
+          sku: String(r['SKU'] || ''),
+          status_orcamento: String(r['STATUS ORÇAMENTO'] || r['Status Orçamento'] || ''),
+          lote: String(r['LOTE'] || r['Lote'] || ''),
+          nf_peca: String(r['NF PEÇA'] || r['NF Peca'] || ''),
+          nf_servico: String(r['NF SERVIÇO'] || r['NF Servico'] || ''),
+          caixa: String(r['CAIXA'] || r['Caixa'] || ''),
           data_transporte: dataSaida
         })).filter(item => item.trade_allied !== '');
 
-        if (!dadosParaInserir.length) {
-          throw new Error('Nenhuma linha válida foi localizada. Verifique se existe a coluna "Trade Allied".');
+        const { error } = await supabaseClient.from('dispositivos').upsert(dadosParaInserir, { onConflict: 'trade_allied' });
+
+        if (error) {
+          document.getElementById('status-importacao').innerText = "Erro ao carregar dados: " + error.message;
+        } else {
+          document.getElementById('status-importacao').innerText = "Planilha importada com sucesso!";
+          fileInput.value = '';
+          await carregarDatasTransporteDisponiveis();
+          alterarDataGlobal(dataSaida);
         }
-
-        const tamanhoLote = 500;
-        let totalImportado = 0;
-        for (let inicio = 0; inicio < dadosParaInserir.length; inicio += tamanhoLote) {
-          const lote = dadosParaInserir.slice(inicio, inicio + tamanhoLote);
-          const { error } = await supabaseClient
-            .from('dispositivos')
-            .upsert(lote, { onConflict: 'trade_allied' });
-          if (error) throw error;
-          totalImportado += lote.length;
-          statusImportacao.innerText = `Importando ${totalImportado} de ${dadosParaInserir.length} registros...`;
-        }
-
-        const { count, error: erroContagem } = await supabaseClient
-          .from('dispositivos')
-          .select('id', { count: 'exact', head: true })
-          .eq('data_transporte', dataSaida);
-
-        if (erroContagem) throw erroContagem;
-        if (!count || count === 0) {
-          throw new Error(`A importação terminou, mas nenhum registro foi encontrado na data ${formatarDataBR(dataSaida)}.`);
-        }
-
-        dataTransporteSelecionada = dataSaida;
-        localStorage.setItem('data_transporte_ativa', dataSaida);
-        await carregarDatasTransporteDisponiveis(dataSaida);
-
-        const selectGlobal = document.getElementById('filtro-data-global');
-        const opcaoExiste = Array.from(selectGlobal.options).some(option => option.value === dataSaida);
-        if (!opcaoExiste) {
-          const option = document.createElement('option');
-          option.value = dataSaida;
-          option.textContent = formatarDataBR(dataSaida);
-          selectGlobal.prepend(option);
-        }
-
-        selectGlobal.value = dataSaida;
-        dataTransporteSelecionada = dataSaida;
-        statusImportacao.className = 'mt-4 text-sm font-semibold text-green-600';
-        statusImportacao.innerText = `Planilha importada com sucesso! ${count} registro(s) disponível(is) em ${formatarDataBR(dataSaida)}.`;
-        fileInput.value = '';
-
-        if (abaAtual === 'logistica') await carregarDadosLogistica();
-      } catch (erro) {
-        console.error('Erro na importação:', erro);
-        statusImportacao.className = 'mt-4 text-sm font-semibold text-red-600';
-        statusImportacao.innerText = 'Erro ao carregar dados: ' + (erro.message || erro);
-      }
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
     }
 
     async function carregarDadosLogistica() {
@@ -1246,6 +1163,159 @@
 
       statusEl.innerText = `Arquivo "${nomeArquivo}" apagado com sucesso.`;
       await listarArquivosAnexados(tipo);
+    }
+
+    async function imprimirEtiquetas() {
+      if (!dataTransporteSelecionada) {
+        alert('Selecione uma data de transporte antes de imprimir as etiquetas.');
+        return;
+      }
+
+      // A janela precisa ser aberta no clique para o navegador não bloquear o pop-up.
+      const janela = window.open('', '_blank');
+      if (!janela) {
+        alert('O navegador bloqueou a janela de etiquetas. Permita pop-ups para este site e tente novamente.');
+        return;
+      }
+      janela.document.write('<p style="font-family:Arial;padding:20px">Preparando etiquetas...</p>');
+
+      const { data, error } = await supabaseClient
+        .from('dispositivos')
+        .select('atendimento, status_orcamento, nf_retorno, nf_peca, nf_servico, nf_remessa_allied, lote, caixa, data_transporte')
+        .eq('data_transporte', dataTransporteSelecionada)
+        .order('nf_retorno', { ascending: true })
+        .order('caixa', { ascending: true });
+
+      if (error) {
+        janela.close();
+        alert('Não foi possível carregar os dados das etiquetas: ' + error.message);
+        return;
+      }
+
+      const registrosValidos = (data || []).filter(item =>
+        String(item.nf_retorno || '').trim() && String(item.caixa || '').trim()
+      );
+
+      if (registrosValidos.length === 0) {
+        janela.close();
+        alert('Não existem registros com NF Retorno e Caixa preenchidas para a data selecionada.');
+        return;
+      }
+
+      // Agrupa primeiro por NF Retorno e depois por caixa.
+      const porNota = new Map();
+      registrosValidos.forEach(item => {
+        const nfRetorno = String(item.nf_retorno || '').trim();
+        const caixa = String(item.caixa || '').trim();
+
+        if (!porNota.has(nfRetorno)) porNota.set(nfRetorno, new Map());
+        const caixasDaNota = porNota.get(nfRetorno);
+        if (!caixasDaNota.has(caixa)) caixasDaNota.set(caixa, []);
+        caixasDaNota.get(caixa).push(item);
+      });
+
+      const compararNatural = (a, b) => String(a).localeCompare(String(b), 'pt-BR', { numeric: true });
+      const primeiroPreenchido = (itens, campo) => {
+        const encontrado = itens.find(item => String(item[campo] || '').trim());
+        return encontrado ? String(encontrado[campo]).trim() : '';
+      };
+      const escaparHtml = valor => String(valor ?? '').replace(/[&<>"']/g, caractere => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[caractere]));
+
+      const etiquetas = [];
+      [...porNota.entries()]
+        .sort((a, b) => compararNatural(a[0], b[0]))
+        .forEach(([nfRetorno, caixasMap]) => {
+          const caixas = [...caixasMap.entries()].sort((a, b) => compararNatural(a[0], b[0]));
+          const totalVolumes = caixas.length;
+
+          caixas.forEach(([caixa, itens], indice) => {
+            etiquetas.push({
+              reparadora: 'CTDI DO BRASIL',
+              atendimento: primeiroPreenchido(itens, 'atendimento') || 'REPARO',
+              status: primeiroPreenchido(itens, 'status_orcamento') || '-',
+              nfRetorno,
+              nfPeca: primeiroPreenchido(itens, 'nf_peca'),
+              nfServico: primeiroPreenchido(itens, 'nf_servico'),
+              quantidade: itens.length,
+              nfEnvio: primeiroPreenchido(itens, 'nf_remessa_allied') || '-',
+              lote: primeiroPreenchido(itens, 'lote') || '-',
+              caixa,
+              volumeAtual: indice + 1,
+              totalVolumes
+            });
+          });
+        });
+
+      const etiquetasHtml = etiquetas.map(etiqueta => `
+        <section class="pagina-etiqueta">
+          <div class="etiqueta">
+            <div class="cabecalho">
+              <div class="reparadora"><span>Reparadora</span><strong>${escaparHtml(etiqueta.reparadora)}</strong></div>
+              <div class="volume"><span>Caixa</span><strong>${etiqueta.volumeAtual} de ${etiqueta.totalVolumes}</strong></div>
+            </div>
+            <div class="tipo-status">${escaparHtml(etiqueta.atendimento).toUpperCase()} - ${escaparHtml(etiqueta.status).toUpperCase()}</div>
+            <div class="notas">
+              <div><strong>NF Retorno:</strong> ${escaparHtml(etiqueta.nfRetorno)}</div>
+              <div><strong>NF Peça:</strong> <span class="linha">${escaparHtml(etiqueta.nfPeca)}</span></div>
+              <div><strong>NF Serviço:</strong> <span class="linha">${escaparHtml(etiqueta.nfServico)}</span></div>
+            </div>
+            <div class="rodape">
+              <div class="quantidade"><strong>Qtde:</strong> ${etiqueta.quantidade}</div>
+              <div class="envio">
+                <div><strong>NF Envio:</strong> ${escaparHtml(etiqueta.nfEnvio)}</div>
+                <div><strong>Lote Envio:</strong> ${escaparHtml(etiqueta.lote)}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      `).join('');
+
+      janela.document.open();
+      janela.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Etiquetas - ${escaparHtml(dataTransporteSelecionada.split('-').reverse().join('/'))}</title>
+<style>
+  @page { size: 70mm 60mm; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; }
+  .acoes { padding: 10px; font-family: Arial, sans-serif; background: #f3f4f6; border-bottom: 1px solid #ccc; }
+  .acoes button { padding: 8px 12px; margin-right: 6px; cursor: pointer; }
+  .acoes span { font-size: 12px; color: #444; }
+  .pagina-etiqueta { width: 70mm; height: 60mm; padding: 2.5mm; break-after: page; page-break-after: always; overflow: hidden; }
+  .pagina-etiqueta:last-child { break-after: auto; page-break-after: auto; }
+  .etiqueta { width: 65mm; height: 55mm; border: 0.45mm solid #111827; border-radius: 6mm; padding: 3mm 4mm; display: flex; flex-direction: column; overflow: hidden; }
+  .cabecalho { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }
+  .reparadora span, .volume span { display: block; font-size: 7.5pt; line-height: 1; }
+  .reparadora strong { display: block; margin-top: 0.8mm; font-size: 11pt; line-height: 1.05; }
+  .volume { min-width: 15mm; text-align: center; }
+  .volume strong { display: block; font-size: 9pt; margin-top: 0.5mm; white-space: nowrap; }
+  .tipo-status { margin-top: 2.2mm; font-size: 11pt; line-height: 1.05; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .notas { margin-top: 3mm; font-size: 9.5pt; line-height: 1.5; }
+  .linha { display: inline-block; min-width: 25mm; min-height: 4mm; border-bottom: 0.25mm solid #111; vertical-align: bottom; }
+  .rodape { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; gap: 2mm; font-size: 9pt; line-height: 1.35; }
+  .quantidade { font-size: 10pt; white-space: nowrap; }
+  .envio { text-align: left; max-width: 37mm; overflow: hidden; }
+  @media print {
+    .acoes { display: none !important; }
+    .pagina-etiqueta { padding: 2.5mm; }
+  }
+</style>
+</head>
+<body>
+  <div class="acoes">
+    <button onclick="window.print()">Imprimir etiquetas</button>
+    <button onclick="window.close()">Fechar</button>
+    <span>${etiquetas.length} etiqueta(s), tamanho 7 cm × 6 cm. Selecione a Zebra ZM400 e use escala 100%.</span>
+  </div>
+  ${etiquetasHtml}
+</body>
+</html>`);
+      janela.document.close();
     }
 
     async function gerarRomaneio() {

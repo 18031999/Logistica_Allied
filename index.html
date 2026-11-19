@@ -1280,15 +1280,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Etiquetas - ${escaparHtml(dataTransporteSelecionada.split('-').reverse().join('/'))}</title>
 <style>
-  @page { size: 70mm 60mm; margin: 0; }
+  @page { size: 70mm 58mm; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; }
   .acoes { padding: 10px; font-family: Arial, sans-serif; background: #f3f4f6; border-bottom: 1px solid #ccc; }
   .acoes button { padding: 8px 12px; margin-right: 6px; cursor: pointer; }
   .acoes span { font-size: 12px; color: #444; }
-  .pagina-etiqueta { width: 70mm; height: 60mm; padding: 2.5mm; break-after: page; page-break-after: always; overflow: hidden; }
+  .pagina-etiqueta { width: 70mm; height: 58mm; padding: 1.5mm; break-after: page; page-break-after: always; overflow: hidden; }
   .pagina-etiqueta:last-child { break-after: auto; page-break-after: auto; }
-  .etiqueta { width: 65mm; height: 55mm; border: 0.45mm solid #111827; border-radius: 6mm; padding: 3mm 4mm; display: flex; flex-direction: column; overflow: hidden; }
+  .etiqueta { width: 67mm; height: 52mm; border: 0.45mm solid #111827; border-radius: 4mm; padding: 3mm 4mm; display: flex; flex-direction: column; overflow: hidden; }
+  n; }
   .cabecalho { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }
   .reparadora span, .volume span { display: block; font-size: 7.5pt; line-height: 1; }
   .reparadora strong { display: block; margin-top: 0.8mm; font-size: 11pt; line-height: 1.05; }
@@ -1302,7 +1303,7 @@
   .envio { text-align: left; max-width: 37mm; overflow: hidden; }
   @media print {
     .acoes { display: none !important; }
-    .pagina-etiqueta { padding: 2.5mm; }
+    .pagina-etiqueta { padding: 1.5mm; }
   }
 </style>
 </head>
@@ -1310,7 +1311,7 @@
   <div class="acoes">
     <button onclick="window.print()">Imprimir etiquetas</button>
     <button onclick="window.close()">Fechar</button>
-    <span>${etiquetas.length} etiqueta(s), tamanho 70 mm × 58 mm. Selecione a Zebra ZM400 e use escala 100%.</span>
+    <span>${etiquetas.length} etiqueta(s), tamanho 70 mm × 55 mm. Selecione a Zebra ZM400 e use escala 100%.</span>
   </div>
   ${etiquetasHtml}
 </body>
